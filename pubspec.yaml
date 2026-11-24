@@ -1,0 +1,9 @@
+# Root of the Kraken pub workspace. Run `flutter pub get` here once;
+# every member below resolves against one shared lockfile.
+name: kraken_workspace
+publish_to: none
+environment:
+  sdk: ^3.13.5
+workspace:
+  - app
+  - packages/ledger

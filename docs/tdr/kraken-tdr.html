@@ -1,0 +1,896 @@
+<title>Kraken Technical Design Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column with a sticky section rail on wide screens; Kraken's own app palette and type. */
+:root{
+  --bg:#FFFFFF; --surface:#F3F4F6; --surface-2:#ECEEF2; --ink:#15171C; --ink-2:#4B5260; --muted:#626873;
+  --line:#E4E6EB; --accent:#1C3BB8; --accent-soft:#E9EEFF; --accent-ink:#FFFFFF;
+  --good:#0F7B4A; --good-soft:#DCF3E8; --warn:#92400E; --warn-soft:#FDECC8; --bad:#B42318; --bad-soft:#FDE5E2;
+  --bar:#1C3BB8; --bar-2:#9AABEF;
+  --f-display:"Poppins",Inter,system-ui,sans-serif; --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1014; --surface:#171A21; --surface-2:#1E222B; --ink:#E9EBF0; --ink-2:#BCC2CD; --muted:#949BA8;
+  --line:#2A2F39; --accent:#8FA3FF; --accent-soft:#1D2547; --accent-ink:#0E1014;
+  --good:#5BD39A; --good-soft:#123326; --warn:#F5B76A; --warn-soft:#3A2A12; --bad:#FF8A7A; --bad-soft:#3B1915;
+  --bar:#8FA3FF; --bar-2:#3D4C8F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1014; --surface:#171A21; --surface-2:#1E222B; --ink:#E9EBF0; --ink-2:#BCC2CD; --muted:#949BA8;
+  --line:#2A2F39; --accent:#8FA3FF; --accent-soft:#1D2547; --accent-ink:#0E1014;
+  --good:#5BD39A; --good-soft:#123326; --warn:#F5B76A; --warn-soft:#3A2A12; --bad:#FF8A7A; --bad-soft:#3B1915;
+  --bar:#8FA3FF; --bar-2:#3D4C8F; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:40px 80px;display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr);gap:0;padding-block:24px 64px}}
+nav.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;display:flex;flex-direction:column;gap:2px;font-size:13px}
+nav.rail a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:8px}
+nav.rail a:hover,nav.rail a:focus-visible{color:var(--ink);background:var(--surface)}
+nav.rail .brand{font:600 18px var(--f-display);color:var(--ink);padding:0 10px 14px;letter-spacing:-.01em}
+@media (max-width:900px){nav.rail{position:static;flex-direction:row;flex-wrap:wrap;gap:6px;margin-bottom:24px}nav.rail .brand{width:100%;padding:0 0 6px}nav.rail a{background:var(--surface);padding:4px 10px}}
+main{min-width:0;display:flex;flex-direction:column;gap:64px}
+section{display:flex;flex-direction:column;gap:18px;scroll-margin-top:24px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.015em}
+h1{font-size:clamp(30px,5vw,44px);line-height:1.12;font-weight:700}
+h2{font-size:26px;font-weight:600;line-height:1.25}
+h3{font-size:17px;font-weight:600;line-height:1.35}
+p{margin:0;max-width:68ch;color:var(--ink-2)}
+.eyebrow{font:600 11px/1 var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.lede{font-size:17px;color:var(--ink-2);max-width:64ch}
+a{color:var(--accent)}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 11px/1 var(--f-body);letter-spacing:.04em;text-transform:uppercase;padding:5px 9px;border-radius:99px;white-space:nowrap}
+.pill.draft{background:var(--warn-soft);color:var(--warn)}
+.pill.high{background:var(--bad-soft);color:var(--bad)}
+.pill.med{background:var(--warn-soft);color:var(--warn)}
+.pill.low{background:var(--good-soft);color:var(--good)}
+.pill.info{background:var(--accent-soft);color:var(--accent)}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.stat b{font:600 26px/1.2 var(--f-display);font-variant-numeric:tabular-nums}
+.stat span{font-size:12.5px;color:var(--muted)}
+
+.callout{background:var(--accent-soft);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.callout p{color:var(--ink);max-width:none}
+.callout.warn{background:var(--warn-soft)}
+
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-weight:600;font-size:12px;color:var(--muted);background:var(--surface);letter-spacing:.02em}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td strong{color:var(--ink)}
+td{color:var(--ink-2)}
+
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.grid2,.grid3{grid-template-columns:minmax(0,1fr)}}
+.card{border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card p{font-size:14px}
+.card ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:14px;display:flex;flex-direction:column;gap:4px}
+.card.pick{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.card .row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+
+pre.code{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto;font:12.5px/1.6 var(--f-mono);color:var(--ink)}
+pre.code .c{color:var(--muted)}
+pre.code .k{color:var(--accent)}
+
+/* Architecture diagram */
+.arch{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:18px}
+.arch-in{min-width:760px;display:grid;grid-template-columns:1.25fr 36px 1fr 36px 1.1fr;align-items:stretch;gap:0}
+.tier{display:flex;flex-direction:column;gap:10px}
+.tier>h4{margin:0;font:600 11px var(--f-body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.box{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:4px}
+.box b{font:600 13.5px var(--f-display);color:var(--ink)}
+.box.hl{border-color:var(--accent)}
+.box .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.box .tags span{font:500 10.5px var(--f-mono);background:var(--surface-2);border-radius:6px;padding:2px 6px;color:var(--ink-2)}
+.layer{display:flex;flex-direction:column;gap:6px;border:1px dashed var(--line);border-radius:12px;padding:8px}
+.layer>i{font-style:normal;font:600 10.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.conn{display:flex;align-items:center;justify-content:center}
+.conn svg{width:36px;height:100%;min-height:120px}
+.conn path{stroke:var(--muted);fill:none;stroke-width:1.5}
+.conn polygon{fill:var(--muted)}
+
+/* Clean architecture rings */
+.rings{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:20px;align-items:center}
+@media (max-width:760px){.rings{grid-template-columns:minmax(0,1fr)}}
+.ring-svg{width:100%;max-width:380px;height:auto;justify-self:center}
+.ring-svg text{font-family:var(--f-body);fill:var(--ink)}
+
+/* Calculator */
+.calc{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);gap:20px}
+@media (max-width:860px){.calc{grid-template-columns:minmax(0,1fr)}}
+.controls{display:flex;flex-direction:column;gap:14px;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.presets button,.seg button{font:500 13px var(--f-body);border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:6px 12px;cursor:pointer}
+.presets button[aria-pressed="true"],.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.ctl{display:flex;flex-direction:column;gap:4px}
+.ctl label{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink-2)}
+.ctl label output{font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--accent)}
+details.adv summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:500}
+.adv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.adv-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.adv-grid input{font:500 13px var(--f-mono);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:100%}
+.result{display:flex;flex-direction:column;gap:14px}
+.total{border-radius:14px;background:var(--surface);padding:16px 18px;display:flex;flex-wrap:wrap;gap:6px 28px;align-items:baseline}
+.total b{font:700 34px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.total span{font-size:13px;color:var(--muted)}
+.bars{display:flex;flex-direction:column;gap:2px}
+.brow{display:grid;grid-template-columns:150px minmax(0,1fr) 84px;gap:10px;align-items:center;font-size:13px;padding:6px 4px;border-radius:8px;position:relative}
+.brow:hover{background:var(--surface)}
+.brow .lbl{color:var(--ink-2)}
+.brow .track{height:12px;background:transparent;position:relative}
+.brow .fill{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:0 4px 4px 0;min-width:2px}
+.brow .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);font-weight:500}
+@media (max-width:480px){.brow{grid-template-columns:110px minmax(0,1fr) 70px}}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:8px;max-width:260px;z-index:20}
+
+/* Timeline */
+.gantt{overflow-x:auto;border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px}
+.g-in{min-width:720px;display:grid;grid-template-columns:190px repeat(17,minmax(0,1fr));row-gap:6px;font-size:12px;align-items:center}
+.g-h{color:var(--muted);text-align:center;font-variant-numeric:tabular-nums;font-size:11px}
+.g-l{color:var(--ink-2);padding-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-bar{height:16px;background:var(--bar);border-radius:4px;margin:0 1px;position:relative}
+.g-bar.ext{background:var(--bar-2)}
+.g-bar.ms{background:transparent;border:2px dashed var(--muted)}
+.g-grid{grid-column:2 / -1;height:1px;background:var(--line)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:10px;border-radius:3px;vertical-align:middle;margin-right:6px}
+
+.pipeline{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.step{flex:1 1 150px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:4px;min-width:0}
+.step b{font:600 13px var(--f-display);color:var(--ink)}
+.step .when{font:500 10.5px var(--f-mono);color:var(--accent)}
+
+pre.mermaid{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;overflow-x:auto;margin:0;font-size:12px}
+.qs{display:flex;flex-direction:column;gap:10px}
+.q{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px}
+.q .n{font:600 13px var(--f-display);color:var(--accent);background:var(--accent-soft);border-radius:8px;height:28px;display:flex;align-items:center;justify-content:center}
+.q p{font-size:14px}
+.q p b{color:var(--ink)}
+.src{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px;padding-left:18px;margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<nav class="rail" aria-label="Sections">
+  <div class="brand">Kraken TDR</div>
+  <a href="#summary">Summary</a>
+  <a href="#requirements">Requirements</a>
+  <a href="#architecture">System architecture</a>
+  <a href="#frontend">Front end</a>
+  <a href="#rules">Rules first</a>
+  <a href="#backend">Back end</a>
+  <a href="#data">Data model</a>
+  <a href="#flows">Key flows</a>
+  <a href="#resources">Resources</a>
+  <a href="#risks">Problems &amp; risks</a>
+  <a href="#cost">Cost</a>
+  <a href="#deploy">Deployment</a>
+  <a href="#timeline">Timeline</a>
+  <a href="#decisions">Decisions needed</a>
+</nav>
+
+<main>
+<!-- ============ SUMMARY ============ -->
+<section id="summary">
+  <div class="meta"><span class="pill draft">Draft for review · v2</span><span>Technical design review</span><span>24 Nov 2026</span><span>Inputs: build guide (Phases 0–9) and the 21-screen design canvas</span></div>
+  <h1>Kraken: an AI expense splitter for Android and iPhone</h1>
+  <p class="lede">Kraken lets a group of friends split costs by typing, talking, or photographing a bill. An on-device rule engine handles each request first; Gemini sees it only when the rules can't produce a valid action. Either way the app validates the action and does every rupee calculation itself, in whole paise. This version plans a <strong>private release</strong> for you and 3–4 friends, installed directly from Xcode and as an Android APK, with no store listing and no paid accounts.</p>
+  <div class="stats">
+    <div class="stat"><b>~16 wks</b><span>solo build; friends using it from week 15, Gmail in week 17</span></div>
+    <div class="stat"><b>5 people</b><span>you + 3–4 friends; only you connect Gmail</span></div>
+    <div class="stat"><b>Rules → AI</b><span>Gemini only as the second attempt</span></div>
+    <div class="stat"><b>$0 / mo</b><span>everything on free tiers, no domain, no store fees</span></div>
+  </div>
+  <div class="callout">
+    <h3>What this review recommends</h3>
+    <p><strong>Flutter + Clean Architecture</strong> on the phone, <strong>Firebase</strong> free tiers (Auth, Firestore, AI Logic, FCM, Hosting) as the platform, and a <strong>Dart back end on Cloud Run</strong> at its free <code>*.run.app</code> address. A pure-Dart <code>intent</code> package parses commands, bills and receipts by rules before anything reaches Gemini, and the shared <code>ledger</code> package does the money maths on both sides. At five users that keeps Gemini to about 5 requests a day, well inside the free tier.</p>
+  </div>
+</section>
+
+<!-- ============ REQUIREMENTS ============ -->
+<section id="requirements">
+  <span class="eyebrow">01 · Requirements</span>
+  <h2>What has to be true at launch</h2>
+  <p>Functional requirements follow the guide's phases, each with an exit gate that has to pass before the next phase merges. Screen names come from the design canvas.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Phase</th><th>Capability</th><th>Design screens</th><th>Exit gate</th></tr></thead>
+    <tbody>
+      <tr><td><strong>0</strong> Foundations</td><td>Two flavors (dev, prod), CI to both phones, Gemini reachable with no key in the app, <code>ledger</code> package</td><td>Hidden debug screen</td><td>Dev build from App Distribution shows a Gemini reply</td></tr>
+      <tr><td><strong>1</strong> Chat sign-in</td><td>Scripted chat onboarding, email-link sign-in, 18+ and privacy consent, optional UPI ID, delete account</td><td>Sign in — chat</td><td>3 testers sign up unaided, one on iPhone</td></tr>
+      <tr><td><strong>2</strong> Ledger</td><td>Groups, invites, expenses with equal / exact / percent / shares, live balances, simplified debts, offline sync, Undo</td><td>Home, Group, Split the total</td><td>Real shared list for a few days matches hand maths</td></tr>
+      <tr><td><strong>3</strong> AI agent</td><td>Agent chat as home; rule engine first, Gemini as fallback; English + Hinglish; 12 actions; clarifying questions; daily AI guard; injection-safe</td><td>Agent chat, action cards</td><td>Rules handle ≥70% of the 60-message test set with zero wrong actions; rules + Gemini ≥90% exact</td></tr>
+      <tr><td><strong>4</strong> Voice</td><td>Hold-to-talk, tap-to-talk, cancel; on-device STT vs audio-to-Gemini decided by measurement</td><td>Voice — hold, Voice — confirm</td><td>9/10 phrases right on both phones</td></tr>
+      <tr><td><strong>5</strong> Bill scan</td><td>On-device text recognition and a bill parser first, Gemini only if totals don't add up; editable review; split by items with proportional tax</td><td>Scan capture, Bill read, Split by items, Split the total</td><td>Total right on 9/10 printed bills</td></tr>
+      <tr><td><strong>6</strong> Settle up</td><td>Record payments; UPI handoff; push reminders (1/day); WhatsApp nudge for non-users</td><td>Settle up</td><td>Real ₹1 UPI payment recorded correctly</td></tr>
+      <tr><td><strong>7</strong> Insights</td><td>Your share by month / year, category, group; AI categories; agent answers spend questions</td><td>Insights</td><td>Every number matches the spreadsheet</td></tr>
+      <tr><td><strong>8</strong> Hardening</td><td>Security, privacy consent, accessibility, performance; private install on friends' phones (no store work)</td><td>All</td><td>Installed on all 5 phones; a week with no blockers</td></tr>
+      <tr><td><strong>9</strong> Gmail</td><td>Receipt suggestions with Add / Change / Just me, for your account only; sender templates first, Gemini fallback</td><td>Gmail ×5, Home card</td><td>Your Gmail in Testing mode; ≥95% of suggestion amounts right</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>Non-functional requirements</h3><ul>
+      <li><strong>Money accuracy:</strong> all amounts are <code>int</code> paise; leftover paise go to the first members (₹100 ÷ 3 = 33.34 / 33.33 / 33.33).</li>
+      <li><strong>Speed:</strong> no screen over 1 s on a mid-range Android; Insights over 1,000 expenses under 1 s.</li>
+      <li><strong>AI quality:</strong> nightly eval ≥90% exact-match; median reply time tracked.</li>
+      <li><strong>Reliability:</strong> works offline, syncs later; ≥99.5% crash-free sessions.</li>
+      <li><strong>Security:</strong> App Check on Firestore, AI and API; rules test per collection; no secrets in the binary.</li>
+      <li><strong>Privacy:</strong> DPDP notice and consent, export and deletion; no email bodies or bill photos stored.</li>
+      <li><strong>Accessibility:</strong> TalkBack / VoiceOver complete add-expense and settle up; 200% text.</li>
+    </ul></div>
+    <div class="card"><h3>Gaps between the design and the guide</h3><ul>
+      <li><strong>Desktop screens:</strong> 7 of 21 artboards are desktop (dashboard, scan split, insights, Gmail). The guide is phones only. Treat them as post-launch; the clean-architecture domain layer is reused unchanged when Flutter web arrives.</li>
+      <li><strong>Forwarding address:</strong> Connect Gmail offers “Forward receipts to Kraken” (<code>name@receipts.your-domain</code>). It needs a mail domain, so it's out of the private release. Hide that option until a public launch.</li>
+      <li><strong>Store work:</strong> Phase 8's closed test, listings, store privacy forms and review are skipped; the privacy consent and delete-account work stays because your friends' data is still real.</li>
+      <li><strong>Export button</strong> on Group and <strong>Totals</strong> tab: not in any phase. Add CSV export to Phase 7.</li>
+      <li><strong>12 actions:</strong> the guide names some; the full list below is inferred and must be checked against the web prototype.</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="architecture">
+  <span class="eyebrow">02 · System architecture</span>
+  <h2>Thin server, smart client, one money package</h2>
+  <p>The phone talks to Firebase directly for data, sign-in and AI, and calls the Dart API only for jobs a client can't be trusted with: deleting accounts, claiming invites, sending reminders, receiving forwarded receipts. Security rules and App Check guard every path.</p>
+  <div class="arch" role="img" aria-label="Architecture: Flutter app on the left, Firebase and Google services in the middle, Dart API on Cloud Run and external services on the right">
+    <div class="arch-in">
+      <div class="tier">
+        <h4>Phone · Flutter (Dart)</h4>
+        <div class="layer"><i>Presentation</i>
+          <div class="box"><b>Screens + Riverpod controllers</b>Agent chat, Home, Group, Scan, Voice, Settle, Insights, Gmail</div>
+        </div>
+        <div class="layer"><i>Domain (pure Dart)</i>
+          <div class="box hl"><b>Use cases · entities · AgentAction</b>RuleInterpreter runs first; ActionValidator checks every action<div class="tags"><span>packages/intent</span><span>packages/ledger</span><span>packages/contracts</span></div></div>
+        </div>
+        <div class="layer"><i>Data</i>
+          <div class="box"><b>Repositories + data sources</b><div class="tags"><span>Firestore</span><span>AI Logic</span><span>KrakenApi</span><span>speech</span><span>ML Kit OCR</span><span>Gmail API</span></div></div>
+        </div>
+      </div>
+      <div class="conn" aria-hidden="true"><svg viewBox="0 0 36 200" preserveAspectRatio="none"><path d="M2 100 H30"/><polygon points="30,95 36,100 30,105"/></svg></div>
+      <div class="tier">
+        <h4>Firebase / Google</h4>
+        <div class="box"><b>Firebase Auth</b>Email-link sign-in via the free <code>kraken-prod.web.app</code> domain</div>
+        <div class="box hl"><b>Cloud Firestore</b>asia-south1 · offline cache · security rules are the access layer</div>
+        <div class="box"><b>Firebase AI Logic → Gemini free tier</b>fallback only; Flash-Lite default, model names in Remote Config</div>
+        <div class="box"><b>App Check</b>Play Integrity on Android · registered debug tokens on iPhone</div>
+        <div class="box"><b>FCM · Remote Config · Crashlytics · Hosting</b>Android reminders, kill switches and AI guard, crashes, link pages</div>
+      </div>
+      <div class="conn" aria-hidden="true"><svg viewBox="0 0 36 200" preserveAspectRatio="none"><path d="M2 100 H30"/><polygon points="30,95 36,100 30,105"/></svg></div>
+      <div class="tier">
+        <h4>Back end · Dart</h4>
+        <div class="box hl"><b>kraken-api on Cloud Run</b>Dart Frog, AOT-compiled, asia-south1, scales to zero, free <code>*.run.app</code> URL<div class="tags"><span>verify ID token</span><span>verify App Check</span><span>ledger</span></div></div>
+        <div class="box"><b>Cloud Scheduler</b>nightly category backfill, invite expiry, AI eval</div>
+        <div class="box"><b>Secret Manager · Artifact Registry</b>no service-account keys in CI (Workload Identity)</div>
+        <h4 style="margin-top:6px">External</h4>
+        <div class="box"><b>UPI apps · WhatsApp</b>handoff by intent / share sheet only</div>
+        <div class="box"><b>Gmail API</b>on-device read of your inbox only, Testing mode</div>
+      </div>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card"><h3>Rules first, then Gemini</h3><p>The rule engine or, as a fallback, Gemini proposes an action. <code>ActionValidator</code> checks group, members, amount &gt; 0 and that shares sum, then <code>ledger</code> computes paise. Every write shows an Undo card.</p></div>
+    <div class="card"><h3>Balances are derived, never stored</h3><p>Balances are recomputed from expenses and payments by <code>ledger</code>. A last-write-wins conflict on one expense can't corrupt a stored total, because there isn't one.</p></div>
+    <div class="card"><h3>Same maths on both sides</h3><p><code>packages/ledger</code> and <code>packages/contracts</code> are imported by the app and the API, so invite claims and reminders compute amounts exactly as the phone does.</p></div>
+  </div>
+</section>
+
+<!-- ============ FRONTEND ============ -->
+<section id="frontend">
+  <span class="eyebrow">03 · Front end</span>
+  <h2>Flutter with Clean Architecture</h2>
+  <div class="rings">
+    <svg class="ring-svg" viewBox="0 0 380 380" role="img" aria-label="Clean architecture rings: ledger at the centre, then domain, then data and presentation, with dependencies pointing inward">
+      <circle cx="190" cy="190" r="180" fill="var(--surface)" stroke="var(--line)"/>
+      <circle cx="190" cy="190" r="132" fill="var(--surface-2)" stroke="var(--line)"/>
+      <circle cx="190" cy="190" r="84" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <circle cx="190" cy="190" r="40" fill="var(--accent)"/>
+      <text x="190" y="194" text-anchor="middle" font-size="12" font-weight="600" style="fill:var(--accent-ink)">ledger</text>
+      <text x="190" y="134" text-anchor="middle" font-size="12" font-weight="600">Domain</text>
+      <text x="190" y="150" text-anchor="middle" font-size="10" style="fill:var(--ink-2)">entities · use cases</text>
+      <text x="190" y="246" text-anchor="middle" font-size="10" style="fill:var(--ink-2)">repository contracts</text>
+      <text x="190" y="80" text-anchor="middle" font-size="12" font-weight="600">Data</text>
+      <text x="190" y="94" text-anchor="middle" font-size="10" style="fill:var(--ink-2)">DTOs · Firestore · AI Logic · API</text>
+      <text x="190" y="298" text-anchor="middle" font-size="12" font-weight="600">Presentation</text>
+      <text x="190" y="312" text-anchor="middle" font-size="10" style="fill:var(--ink-2)">widgets · Riverpod controllers</text>
+      <text x="190" y="30" text-anchor="middle" font-size="10" style="fill:var(--muted)">dependencies point inward</text>
+      <path d="M190 40 V58" stroke="var(--muted)" stroke-width="1.5"/><polygon points="185,58 195,58 190,66" fill="var(--muted)"/>
+    </svg>
+    <div class="card" style="border:0;padding:0">
+      <h3>The rules</h3>
+      <ul>
+        <li><strong>Domain</strong> is pure Dart: no Flutter, no Firebase imports. It holds entities (<code>Group</code>, <code>Expense</code>, <code>Money</code>), the sealed <code>AgentAction</code> hierarchy, use cases, and repository interfaces.</li>
+        <li><strong>Data</strong> implements those interfaces with Firestore, AI Logic and the API, mapping DTOs to entities. Swapping AI Logic for a server proxy later is a data-layer change only.</li>
+        <li><strong>Presentation</strong> uses Riverpod <code>Notifier</code>s that call use cases; widgets never touch a repository.</li>
+        <li><strong>Errors</strong> cross layers as a sealed <code>Result&lt;T&gt;</code> with typed <code>Failure</code>s, so the agent can repeat a refusal in plain words.</li>
+        <li><strong>Tests</strong> follow the layers: domain and ledger by unit test, data against the Firestore emulator, presentation by widget test, flows by <code>integration_test</code>.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="grid2">
+<pre class="code"><span class="c">kraken/</span>
+  app/lib/
+    core/         <span class="c">di, router, theme, flavors, result, logging</span>
+    ui_kit/       <span class="c">chat bubbles, chips, action cards + Undo</span>
+    features/
+      agent/
+        domain/   <span class="c">agent_action.dart, validate_action.dart,</span>
+                  <span class="c">run_agent_turn.dart, agent_gateway.dart</span>
+        data/     <span class="c">ai_logic_agent_gateway.dart, chat_repo_fs.dart</span>
+        presentation/ <span class="c">agent_controller.dart, chat_screen.dart</span>
+      onboarding/ groups/ voice/ scan/
+      settle/ insights/ gmail/ settings/
+    debug/        <span class="c">dev flavor only</span>
+  packages/
+    intent/       <span class="c">rule engine: lexicon, patterns, bill + receipt parsers</span>
+    ledger/       <span class="c">Money, splits, balances, simplify</span>
+    contracts/    <span class="c">API DTOs + action JSON schema</span>
+  server/         <span class="c">Dart Frog → Cloud Run</span>
+  firebase/       <span class="c">rules, indexes, hosting</span>
+  test_sets/      <span class="c">ai_prompts.yaml, voice/, bills/</span></pre>
+<pre class="code"><span class="c">// domain/agent_action.dart — pure Dart</span>
+<span class="k">sealed class</span> AgentAction { <span class="k">const</span> AgentAction(); }
+<span class="k">final class</span> AddExpense <span class="k">extends</span> AgentAction {
+  <span class="k">final</span> GroupId group; <span class="k">final</span> Money amount;
+  <span class="k">final</span> MemberId paidBy; <span class="k">final</span> Split split;
+  <span class="k">final</span> String description;
+  ...
+}
+
+<span class="c">// domain/validate_action.dart</span>
+Result&lt;ValidAction&gt; validate(AgentAction a, LedgerSnapshot s) =>
+  <span class="k">switch</span> (a) {
+    AddExpense(:<span class="k">final</span> group, :<span class="k">final</span> amount, :<span class="k">final</span> split) =>
+      !s.hasGroup(group)    ? Failure.unknownGroup(group)
+      : amount.paise &lt;= 0   ? Failure.badAmount(amount)
+      : !split.sumsTo(amount) ? Failure.sharesDontAdd()
+      : Ok(ValidAction(a)),
+    ...
+  };</pre>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Agent action</th><th>What it does</th><th>Phase on</th></tr></thead>
+    <tbody>
+      <tr><td><code>add_expense</code> · <code>edit_expense</code> · <code>delete_expense</code></td><td>Write expenses through the same use cases as the form</td><td>3</td></tr>
+      <tr><td><code>show</code></td><td>Balances, who owes whom, a group's expenses</td><td>3</td></tr>
+      <tr><td><code>create_group</code> · <code>add_member</code></td><td>Group setup by message</td><td>3</td></tr>
+      <tr><td><code>record_payment</code></td><td>“I paid Meera 1850”, “settle up with Meera”</td><td>6</td></tr>
+      <tr><td><code>split_bill</code></td><td>“Arjun and Meera had the thalis, rest is shared”</td><td>5</td></tr>
+      <tr><td><code>remind</code> · <code>set_upi</code></td><td>Nudge a friend; save your UPI ID</td><td>6</td></tr>
+      <tr><td><code>show_spending</code></td><td>“How much did I spend on food in October?”</td><td>7</td></tr>
+      <tr><td><code>review_gmail_suggestions</code></td><td>Suggestion cards in chat</td><td>9</td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:13px;color:var(--muted)">Action names are inferred from the guide. Check them against the web prototype's declarations in Phase 3, day 2.</p>
+</section>
+
+<!-- ============ RULES FIRST ============ -->
+<section id="rules">
+  <span class="eyebrow">04 · Rules first, Gemini second</span>
+  <h2>Every request tries the rule engine before the AI</h2>
+  <p>Typed text, voice transcripts, bill photos and Gmail receipts all go through deterministic, on-device rules first. Gemini gets a request only when the rules can't produce an action that passes the validator. Everyday commands never leave the phone, cost nothing and answer instantly. That keeps a group of five inside the free tier.</p>
+<pre class="mermaid">
+flowchart TD
+  A["Typed text or on-device speech"] --> B["Normalise: case, Hinglish words, 2.5k, 1 lakh, ₹2,100"]
+  B --> C{"Rule match?"}
+  C -- "one intent, all slots filled" --> D["ActionValidator + ledger"]
+  C -- "intent clear, one slot missing" --> Q["Scripted question with chips"]
+  Q --> B
+  C -- "no match or ambiguous" --> G["Gemini: one request, current group only"]
+  D -- valid --> K["Card with Undo"]
+  D -- refused --> G
+  G --> D2["ActionValidator + ledger"]
+  D2 -- valid --> K
+  D2 -- refused --> E["Plain-words reason, nothing saved"]
+</pre>
+  <div class="tbl"><table>
+    <thead><tr><th>Surface</th><th>Rules first (free, on the phone)</th><th>Goes to Gemini only when</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Agent commands</strong></td><td>Add expense, record payment, balances, “who owes me”, delete last, undo, remind, settle up, “food in October”. Patterns over a lexicon of verbs (<em>paid, diya, split, baant</em>), amounts from <code>ledger</code>'s parser, names matched to group members and aliases</td><td>No intent matches, two intents in one message, a name that matches nobody or two people, free-form splits like “Arjun and Meera had the thalis, rest is shared”</td></tr>
+      <tr><td><strong>Voice</strong></td><td>On-device <code>speech_to_text</code> in en-IN and hi-IN, then the same rules. Audio never leaves the phone</td><td>Same as typed commands</td></tr>
+      <tr><td><strong>Bill scan</strong></td><td>ML Kit text recognition on the phone, then a line parser for item, qty and price, GST, service charge and TOTAL. Accepted only when items + charges equal the printed total</td><td>Totals don't reconcile or too few lines were read: the resized photo goes to Gemini once</td></tr>
+      <tr><td><strong>Gmail receipts</strong></td><td>Sender templates for Swiggy, Zomato, Uber, Ola, Amazon, Flipkart, BookMyShow and others; subject keywords; “Total ₹X” patterns</td><td>A receipt-like email from an unknown sender</td></tr>
+      <tr><td><strong>Categories</strong></td><td>Merchant and keyword map (Swiggy → Food, Uber → Transport, rent → Home)</td><td>No keyword hit; misses are batched, 20 expenses per request</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="card"><h3>When the rules are allowed to act</h3><p>A wrong guess saves a wrong amount; an escalation costs one free request. So the rules act only when all of these hold:</p><ul>
+      <li>exactly one intent matched</li>
+      <li>the amount has one reading (“2.5k” yes, “25 or 30” no)</li>
+      <li>every name resolves to exactly one group member</li>
+      <li>the group is known, from the current screen or by name</li>
+      <li>the validator accepts the action</li>
+    </ul><p>Anything else escalates. If only the amount or payer is missing, the rules ask a scripted question instead, which costs nothing.</p></div>
+    <div class="card"><h3>Keeping Gemini calls rare</h3><ul>
+      <li><strong>One request per fallback.</strong> The app writes the reply from a template, so there is no second round trip with tool results.</li>
+      <li><strong>Small prompts.</strong> Only the current group's names and recent amounts are sent, with no chat history.</li>
+      <li><strong>Daily guard.</strong> A Firestore counter stops at 15 requests a day for the project and 5 per person, below the free limit. Past it, Kraken says AI is off for today and shows phrasings the rules understand.</li>
+      <li><strong>Misses become rules.</strong> Each fallback is saved to the sender's own <code>ruleMisses</code> list, so common phrasings get new patterns.</li>
+      <li><strong>Measured.</strong> The test set reports rules hit rate, rules errors (must be zero) and combined accuracy.</li>
+    </ul></div>
+  </div>
+<pre class="code"><span class="c">// features/agent/domain/interpret_command.dart (pure Dart)</span>
+<span class="k">final class</span> InterpretCommand {
+  InterpretCommand(<span class="k">this</span>._rules, <span class="k">this</span>._gemini, <span class="k">this</span>._validator, <span class="k">this</span>._quota);
+  <span class="k">final</span> RuleInterpreter _rules;     <span class="c">// packages/intent, on device</span>
+  <span class="k">final</span> AgentGateway _gemini;       <span class="c">// data layer: Firebase AI Logic</span>
+  <span class="k">final</span> ActionValidator _validator;
+  <span class="k">final</span> AiQuota _quota;             <span class="c">// daily guard in Firestore</span>
+
+  Future&lt;Outcome&gt; call(String text, LedgerSnapshot s) <span class="k">async</span> {
+    <span class="c">// 1st attempt: always rules</span>
+    <span class="k">switch</span> (_rules.parse(text, s)) {
+      <span class="k">case</span> Confident(:<span class="k">final</span> action):
+        <span class="k">if</span> (_validator.validate(action, s) <span class="k">case</span> Ok(:<span class="k">final</span> value)) {
+          <span class="k">return</span> Outcome.done(value, by: Source.rules);
+        }
+      <span class="k">case</span> NeedsSlot(:<span class="k">final</span> question):
+        <span class="k">return</span> Outcome.ask(question);           <span class="c">// scripted chips, no AI</span>
+      <span class="k">case</span> NoMatch():
+        <span class="k">break</span>;
+    }
+    <span class="c">// 2nd attempt: Gemini, once</span>
+    <span class="k">if</span> (!<span class="k">await</span> _quota.tryTake()) <span class="k">return</span> Outcome.aiOffToday();
+    <span class="k">final</span> proposed = <span class="k">await</span> _gemini.propose(text, s.compactForGroup());
+    <span class="k">return switch</span> (_validator.validate(proposed, s)) {
+      Ok(:<span class="k">final</span> value) => Outcome.done(value, by: Source.gemini),
+      Err(:<span class="k">final</span> failure) => Outcome.refused(failure),
+    };
+  }
+}</pre>
+  <p>Work this adds: 3 days in Phase 3 (lexicon, patterns, slot filling, test cases), 2 days in Phase 5 (ML Kit and the bill parser), 1 day in Phase 9 (sender templates) and half a day in Phase 7 (keyword categories). The timeline below includes them.</p>
+</section>
+
+<!-- ============ BACKEND ============ -->
+<section id="backend">
+  <span class="eyebrow">05 · Back end</span>
+  <h2>Dart, but on Cloud Run</h2>
+  <p>You asked for a Dart back end. The guide plans Dart Cloud Functions, which Firebase still marks experimental: HTTP and callable only, no Firestore triggers, not listed in the console. A Dart server in a container on Cloud Run keeps the shared <code>ledger</code> and avoids those limits.</p>
+  <div class="grid3">
+    <div class="card"><div class="row"><h3>A · Dart Cloud Functions</h3><span class="pill med">Experimental</span></div><ul><li>Least setup, deploys with <code>firebase deploy</code></li><li>HTTP / callable only; no triggers</li><li>Must call by URL; invisible in console</li><li>Risk the experiment changes mid-build</li></ul></div>
+    <div class="card pick"><div class="row"><h3>B · Dart Frog on Cloud Run</h3><span class="pill info">Recommended</span></div><ul><li>Stable runtime; AOT binary starts fast</li><li>Same code shape as A; middleware for auth and App Check</li><li>Revisions with traffic split and one-click rollback</li><li>Free tier covers launch traffic</li></ul></div>
+    <div class="card"><div class="row"><h3>C · Serverpod</h3><span class="pill low">Not now</span></div><ul><li>Full Dart stack with typed client</li><li>Needs Postgres and its own auth; replaces Firestore</li><li>Loses offline sync and live listeners</li><li>Too much rebuild for one developer</li></ul></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Endpoint</th><th>Why it's server-side</th><th>Phase</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST /v1/account/delete</code></td><td>Deletes Auth user and data, anonymises name in shared groups; needs Admin rights</td><td>1</td></tr>
+      <tr><td><code>POST /v1/account/export</code></td><td>DPDP data export as JSON</td><td>8</td></tr>
+      <tr><td><code>POST /v1/invites/claim</code></td><td>Transaction so two people can't claim one name</td><td>2</td></tr>
+      <tr><td><code>POST /v1/reminders</code></td><td>Membership check, one per person per day, sends FCM</td><td>6</td></tr>
+      <tr><td><code>POST /v1/ai/take</code></td><td>Takes one request from the daily Gemini guard in a transaction, so a phone can't skip it</td><td>3</td></tr>
+      <tr><td><code>POST /v1/inbound-email</code></td><td>Later, for a public launch: forwarded receipts. Needs a mail domain</td><td>later</td></tr>
+      <tr><td><code>POST /jobs/*</code></td><td>Scheduler jobs: category backfill, invite expiry</td><td>7</td></tr>
+    </tbody>
+  </table></div>
+  <p>The API lives at its free Cloud Run address (<code>https://kraken-api-&lt;hash&gt;.asia-south1.run.app</code>), so no domain is needed. Every request carries the Firebase ID token and App Check token as headers; the middleware verifies both before any handler runs. The app uses a typed client from <code>packages/contracts</code> over plain HTTPS. If Cloud Run becomes a blocker, the guide's fallback still applies: write these handlers in TypeScript Cloud Functions, nothing else changes.</p>
+</section>
+
+<!-- ============ DATA ============ -->
+<section id="data">
+  <span class="eyebrow">06 · Data model</span>
+  <h2>Firestore collections</h2>
+  <p>Money is stored as integer paise. Each change writes its activity entry in the same batch, and rules check the author is the signed-in member. Firestore's location can't be changed later, so pick <code>asia-south1</code> (Mumbai) on day 1.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Path</th><th>Key fields</th><th>Who can read / write</th></tr></thead>
+    <tbody>
+      <tr><td><code>users/{uid}</code></td><td>displayName, upiId, consent {adultAt, privacyVersion}</td><td>Owner only</td></tr>
+      <tr><td><code>users/{uid}/chats/{id}</code></td><td>role, text, actions[], createdAt (last 15 turns sent as context)</td><td>Owner only</td></tr>
+      <tr><td><code>users/{uid}/devices/{token}</code></td><td>platform, updatedAt</td><td>Owner; API reads for push</td></tr>
+      <tr><td><code>usage/{yyyy-mm-dd}</code></td><td>geminiCalls (project), perUser {uid: n}</td><td>API writes; members read</td></tr>
+      <tr><td><code>users/{uid}/ruleMisses/{id}</code></td><td>text, surface, geminiAction, at; used to write new rules</td><td>Owner only</td></tr>
+      <tr><td><code>users/{uid}/gmail/{messageId}</code></td><td>status, shop, totalPaise, date, items (never email text)</td><td>Owner only</td></tr>
+      <tr><td><code>groups/{gid}</code></td><td>name, memberUids[], members {id: name, uid?, upiId?}</td><td>Members</td></tr>
+      <tr><td><code>groups/{gid}/expenses/{eid}</code></td><td>amountPaise, paidBy {id: paise}, shares {id: paise}, splitType, items[], category, source (form · agent · voice · scan · gmail), parsedBy (rules · gemini), version</td><td>Members</td></tr>
+      <tr><td><code>groups/{gid}/payments/{pid}</code></td><td>from, to, amountPaise, method (upi · cash · bank)</td><td>Members</td></tr>
+      <tr><td><code>groups/{gid}/activity/{aid}</code></td><td>authorUid, kind, ref, at</td><td>Members; author must be caller</td></tr>
+      <tr><td><code>invites/{code}</code></td><td>gid, expiresAt, claims</td><td>Read by code; claim via API</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ FLOWS ============ -->
+<section id="flows">
+  <span class="eyebrow">07 · Key flows</span>
+  <h2>How a message becomes an expense</h2>
+<pre class="mermaid">
+sequenceDiagram
+  actor U as You
+  participant C as AgentController
+  participant I as InterpretCommand
+  participant RB as RuleInterpreter
+  participant G as Gemini (fallback)
+  participant V as Validator + ledger
+  participant F as Firestore
+  U->>C: "Add me, Sreya for 2100, equal split"
+  C->>I: interpret(text, snapshot)
+  I->>RB: parse
+  alt rules confident
+    RB-->>I: add_expense(210000 paise, equal, you + Sreya)
+  else no match
+    I->>G: one request, current group only
+    G-->>I: add_expense(...)
+  end
+  I->>V: validate + compute shares
+  V-->>I: 105000 / 105000 paise
+  I->>F: batch: expense + activity entry
+  F-->>C: balances update live
+  C-->>U: "Added ₹2,100 to Goa Trip" card with Undo
+</pre>
+<pre class="mermaid">
+sequenceDiagram
+  actor U as You
+  participant A as App
+  participant O as ML Kit OCR (on device)
+  participant B as bill_model (Gemini)
+  participant L as ledger
+  participant F as Firestore
+  U->>A: Photo of bill
+  A->>O: recognise text
+  O-->>A: lines of text
+  A->>A: Rule parser: items, GST, service, TOTAL
+  alt items + charges = printed total
+    A->>A: use the rule result
+  else does not reconcile
+    A->>B: resized photo + JSON schema, one request
+    B-->>A: items, taxes, total
+  end
+  A->>A: Convert to paise, editable review
+  U->>A: Fix lines, split by items
+  A->>L: item shares + proportional tax
+  L-->>A: shares sum to total exactly
+  A->>F: expense (source: scan), photo discarded
+</pre>
+</section>
+
+<!-- ============ RESOURCES ============ -->
+<section id="resources">
+  <span class="eyebrow">08 · Resources</span>
+  <h2>What you need before day 1</h2>
+  <div class="grid3">
+    <div class="card"><h3>People</h3><ul>
+      <li>1 full-time Flutter developer (you)</li>
+      <li>3–4 friends as users and testers, at least one on iPhone</li>
+      <li>iPhone friends within reach of your Mac once a week (see R1)</li>
+      <li>2 of them for the real shared list (Phase 2)</li>
+    </ul></div>
+    <div class="card"><h3>Hardware</h3><ul>
+      <li>Mac that runs Xcode 26</li>
+      <li>One mid-range Android phone (perf target)</li>
+      <li>One iPhone on iOS 26</li>
+      <li>Optional second Android for 3-phone group tests</li>
+    </ul></div>
+    <div class="card"><h3>Accounts (all free)</h3><ul>
+      <li>Your Apple ID as a free personal team in Xcode</li>
+      <li>Firebase <code>kraken-dev</code> + <code>kraken-prod</code>; Blaze with a $1 budget alert, only because Cloud Run needs billing on</li>
+      <li>Gemini API key from AI Studio, free tier, entered in AI Logic</li>
+      <li>GitHub repository + Actions</li>
+      <li>Google Cloud OAuth consent screen in Testing mode (Gmail)</li>
+      <li>No Play Console, no paid Apple program, no domain</li>
+    </ul></div>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>Layer</th><th>Packages / services</th></tr></thead>
+    <tbody>
+      <tr><td><strong>App core</strong></td><td><code>flutter_riverpod</code>, <code>go_router</code>, <code>intl</code>, <code>freezed</code> + <code>json_serializable</code> for entities and DTOs</td></tr>
+      <tr><td><strong>Firebase</strong></td><td><code>firebase_core</code>, <code>firebase_auth</code>, <code>cloud_firestore</code>, <code>firebase_ai</code>, <code>firebase_app_check</code>, <code>firebase_remote_config</code>, <code>firebase_crashlytics</code>, <code>firebase_messaging</code></td></tr>
+      <tr><td><strong>Device</strong></td><td><code>app_links</code>, <code>speech_to_text</code>, <code>permission_handler</code>, <code>image_picker</code>, <code>google_mlkit_text_recognition</code>, <code>url_launcher</code>, <code>share_plus</code>, <code>flutter_local_notifications</code>, <code>fl_chart</code></td></tr>
+      <tr><td><strong>Gmail</strong></td><td><code>google_sign_in</code>, <code>googleapis</code>, <code>workmanager</code></td></tr>
+      <tr><td><strong>Server</strong></td><td><code>dart_frog</code>, <code>dart_firebase_admin</code>, <code>googleapis_auth</code>, shared <code>ledger</code> and <code>contracts</code></td></tr>
+      <tr><td><strong>Rules</strong></td><td><code>packages/intent</code> (pure Dart): lexicon and patterns as YAML data, slot fillers, bill line parser, receipt sender templates</td></tr>
+      <tr><td><strong>Tooling</strong></td><td>Firebase Emulator Suite, Firebase App Distribution (Android APKs), <code>very_good_analysis</code> lints, <code>mocktail</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ RISKS ============ -->
+<section id="risks">
+  <span class="eyebrow">09 · Problems &amp; risks</span>
+  <h2>Where the build will hurt</h2>
+  <p>Ranked for the private, free-tier release. The free setup removes the store and approval risks but brings its own limits, mostly on iPhone.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Problem</th><th>Impact</th><th>What we do about it</th></tr></thead>
+    <tbody>
+      <tr><td>R1</td><td><strong>A free Apple ID limits the iPhone build.</strong> Apps installed from Xcode with a free personal team stop opening after 7 days. Push notifications, Universal Links (Associated Domains) and App Attest aren't available.</td><td><span class="pill high">High</span></td><td>Re-install from Xcode weekly (a <code>tool/ios_install.sh</code> script makes it one command). Finish email-link sign-in through a small Hosting page that hands the link to the app's <code>kraken://</code> scheme. Register an App Check debug token per iPhone. On iPhone, reminders are in-app and WhatsApp only. Android has none of these limits.</td></tr>
+      <tr><td>R2</td><td><strong>Gemini free-tier data terms.</strong> Google can use free-tier prompts and responses to improve its products, and human reviewers may read them. That covers your friends' names and amounts, and receipt text.</td><td><span class="pill high">High</span></td><td>Tell your friends and record their OK in the onboarding consent. With rules first, most commands never leave the phone. Fallbacks send only first names and amounts from one group. Template-matched receipts are never sent. Switching to the paid tier would cost under $1 a month at this scale.</td></tr>
+      <tr><td>R3</td><td><strong>A rule matches wrongly.</strong> A confident rule that picks the wrong person or amount saves bad data without the AI ever being asked.</td><td><span class="pill high">High</span></td><td>Strict confidence conditions, escalate when unsure, confirm card with Undo, near-miss phrasings in the test set, and a gate of zero wrong rule actions.</td></tr>
+      <tr><td>R4</td><td><strong>The free-tier quota is small and changes without notice.</strong> It is per project, shared by all five of you, and developers report Flash limits as low as ~20 requests a day.</td><td><span class="pill med">Medium</span></td><td>Rules first, one request per fallback, Flash-Lite by default, and a server-side daily guard below the limit. Dev and prod are separate projects with separate quotas. When the guard trips, Kraken still works by rules and forms.</td></tr>
+      <tr><td>R5</td><td><strong>UPI handoff is unreliable.</strong> Many UPI apps reject a P2P request with a pre-filled amount launched by another app, and iPhone has no shared <code>upi://</code> handler, only per-app schemes.</td><td><span class="pill high">High</span></td><td>Show a UPI QR and Copy UPI ID beside “Pay with UPI”. Always ask “Did you pay?” and never claim the payment was verified. Test GPay, PhonePe, Paytm on both platforms (Phase 6 day 6).</td></tr>
+      <tr><td>R6</td><td><strong>Gemini gets an amount or a person wrong</strong> on the fallback path: Hinglish, two Rahuls, prompt injection in expense names or receipts.</td><td><span class="pill med">Medium</span></td><td>Validator plus <code>ledger</code> own the numbers; the amount is cross-checked against <code>ledger</code>'s own parse of the text; Undo on every write.</td></tr>
+      <tr><td>R7</td><td><strong>Gmail in Testing mode.</strong> No CASA is needed for test users, but Google expires the refresh token after 7 days and shows an “unverified app” screen.</td><td><span class="pill med">Medium</span></td><td>Add yourself as a test user. When the token expires, show a one-tap Reconnect card. Since only you connect Gmail, that's one tap a week.</td></tr>
+      <tr><td>R8</td><td><strong>Cloud Run needs billing turned on</strong>, so a card has to be on file even though usage stays at $0.</td><td><span class="pill med">Medium</span></td><td>$1 budget alert, max instances 1, scale to zero. If you'd rather not add a card, Render's free web service runs the same Docker image, but its first request after idle takes about 30–60 s.</td></tr>
+      <tr><td>R9</td><td><strong>Rules need upkeep.</strong> People phrase things in many ways, and Hinglish varies.</td><td><span class="pill med">Medium</span></td><td>Keep the lexicon and patterns as data (YAML), not code; turn the <code>ruleMisses</code> list into new patterns each week; every miss becomes a test case.</td></tr>
+      <tr><td>R10</td><td><strong>Dart Cloud Functions are experimental.</strong></td><td><span class="pill low">Low</span></td><td>Avoided: Dart Frog on Cloud Run (section 05). TypeScript stays the fallback.</td></tr>
+      <tr><td>R11</td><td><strong>Email-link sign-in breaks in the wild.</strong> Links land in spam or open in Gmail's in-app browser.</td><td><span class="pill low">Low</span></td><td>The free Hosting domain works as the link domain; Android uses App Links on it; iPhone uses the bounce page from R1. With five people you can help each one sign in.</td></tr>
+      <tr><td>R12</td><td><strong>Solo schedule has no slack.</strong></td><td><span class="pill low">Low</span></td><td>No store review to wait for now, so a slipped gate only delays installing on your friends' phones.</td></tr>
+      <tr><td>R13</td><td><strong>Privacy, even in private.</strong> Friends' spending is personal data under DPDP.</td><td><span class="pill low">Low</span></td><td>Keep the consent screen and delete-account flow; store no email bodies or bill photos.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ COST ============ -->
+<section id="cost">
+  <span class="eyebrow">10 · Cost</span>
+  <h2>₹0 for you and four friends</h2>
+  <p>For a private group installed straight from Xcode and as an Android APK, nothing needs a paid account. The table compares that with what a public launch would cost.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Item</th><th class="num">Public launch</th><th class="num">Your private plan</th><th>How it's free</th></tr></thead>
+    <tbody>
+      <tr><td>Apple Developer Program</td><td class="num">$99 / yr</td><td class="num"><strong>$0</strong></td><td>Free Apple ID as a personal team in Xcode; re-install every 7 days</td></tr>
+      <tr><td>Google Play Console</td><td class="num">$25 once</td><td class="num"><strong>$0</strong></td><td>APKs through Firebase App Distribution</td></tr>
+      <tr><td>Domain</td><td class="num">~$12 / yr</td><td class="num"><strong>$0</strong></td><td><code>kraken-prod.web.app</code> for sign-in and link files; <code>*.run.app</code> for the API</td></tr>
+      <tr><td>CASA assessment (Gmail)</td><td class="num">~$540+ / yr</td><td class="num"><strong>$0</strong></td><td>OAuth app stays in Testing mode; you're the only test user</td></tr>
+      <tr><td>Gemini</td><td class="num">usage</td><td class="num"><strong>$0</strong></td><td>Free tier; rules handle most requests (check below)</td></tr>
+      <tr><td>Firebase: Auth, Firestore, FCM, Hosting, Crashlytics, Remote Config</td><td class="num">free tiers</td><td class="num"><strong>$0</strong></td><td>Five users use well under 1% of the daily quotas</td></tr>
+      <tr><td>Cloud Run (Dart API)</td><td class="num">free tier</td><td class="num"><strong>$0</strong></td><td>2M requests a month free; needs billing on, with a $1 budget alert</td></tr>
+      <tr><td>CI (GitHub Actions)</td><td class="num">~$0–70 / mo</td><td class="num"><strong>$0</strong></td><td>Android builds in CI; iPhone builds on your Mac</td></tr>
+      <tr><td><strong>Total</strong></td><td class="num"><strong>~$856 yr one</strong></td><td class="num"><strong>$0</strong></td><td>Optional: a mid-range Android test phone (~$180) if you don't have one</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Does it stay inside the Gemini free tier?</h3>
+  <p>Google doesn't publish fixed free-tier numbers any more, and developer reports range from about 20 to 1,000 requests a day depending on the model. The check below assumes a cautious 20 a day. The limit is per project, so all five of you share it.</p>
+  <div class="calc">
+    <div class="controls">
+      <div class="ctl"><label for="fp">People <output id="o-fp"></output></label><input id="fp" type="range" min="1" max="10" step="1" value="5"></div>
+      <div class="ctl"><label for="fc">Commands per person per day <output id="o-fc"></output></label><input id="fc" type="range" min="1" max="20" step="1" value="4"></div>
+      <div class="ctl"><label for="fr">Commands the rules handle <output id="o-fr"></output></label><input id="fr" type="range" min="0" max="95" step="5" value="75"></div>
+      <div class="ctl"><label for="fs">Bill scans per person per week <output id="o-fs"></output></label><input id="fs" type="range" min="0" max="10" step="1" value="1"></div>
+      <div class="ctl"><label for="fo">Bills the on-device parser reads <output id="o-fo"></output></label><input id="fo" type="range" min="0" max="95" step="5" value="70"></div>
+      <div class="ctl"><label for="fg">Your Gmail receipts per week <output id="o-fg"></output></label><input id="fg" type="range" min="0" max="30" step="1" value="5"></div>
+      <div class="ctl"><label for="fl">Free-tier requests per day (check AI Studio) <output id="o-fl"></output></label><input id="fl" type="range" min="10" max="1000" step="10" value="20"></div>
+    </div>
+    <div class="result">
+      <div class="total"><div><b id="fq-req">0</b><span> Gemini requests a day</span></div><span id="fq-pct"></span></div>
+      <div class="bars" aria-label="Gemini requests per day against the free limit">
+        <div class="brow"><span class="lbl">With rules first</span><span class="track"><span class="fill" id="fq-bar-a"></span></span><span class="val" id="fq-val-a"></span></div>
+        <div class="brow"><span class="lbl">Gemini for everything</span><span class="track"><span class="fill" id="fq-bar-b" style="background:var(--bar-2)"></span></span><span class="val" id="fq-val-b"></span></div>
+        <div class="brow"><span class="lbl">Free limit</span><span class="track"><span class="fill" id="fq-bar-l" style="background:transparent;border:2px dashed var(--muted)"></span></span><span class="val" id="fq-val-l"></span></div>
+      </div>
+      <div class="callout" id="fq-note"><p></p></div>
+      <p style="font-size:12.5px;color:var(--muted)">Each fallback is one request. Categories add about one batched request a day. Firestore at this size is about 500 reads a day against 50,000 free.</p>
+    </div>
+  </div>
+
+  <details class="adv">
+  <summary>Later: monthly cost if you launch publicly on the paid tier</summary>
+  <p style="margin-top:10px">Pick a stage, or move the sliders. Token sizes and prices are under “Assumptions”. Gemini prices are recent list rates; check the official pricing page before relying on them.</p>
+  <div class="calc" style="margin-top:12px">
+    <div class="controls">
+      <div class="presets" role="group" aria-label="Stage">
+        <button type="button" data-preset="beta">Beta · 100</button>
+        <button type="button" data-preset="launch" aria-pressed="true">Launch · 1k</button>
+        <button type="button" data-preset="growth">Growth · 10k</button>
+        <button type="button" data-preset="scale">Scale · 50k</button>
+      </div>
+      <div class="ctl"><label for="mau">Monthly active users <output id="o-mau"></output></label><input id="mau" type="range" min="100" max="50000" step="100" value="1000"></div>
+      <div class="ctl"><label for="msgs">Agent messages per user / month <output id="o-msgs"></output></label><input id="msgs" type="range" min="5" max="150" step="5" value="30"></div>
+      <div class="ctl"><label for="rules">Messages the rules handle <output id="o-rules"></output></label><input id="rules" type="range" min="0" max="95" step="5" value="75"></div>
+      <div class="ctl"><label for="flash">Gemini fallbacks escalated to Flash <output id="o-flash"></output></label><input id="flash" type="range" min="0" max="100" step="5" value="20"></div>
+      <div class="ctl"><label for="scans">Bill scans per user / month <output id="o-scans"></output></label><input id="scans" type="range" min="0" max="20" step="1" value="3"></div>
+      <div class="ctl"><label for="gmail">Users with Gmail / forwarding on <output id="o-gmail"></output></label><input id="gmail" type="range" min="0" max="100" step="5" value="30"></div>
+      <div class="ctl"><span style="font-size:13px;color:var(--ink-2)">iOS CI builds</span>
+        <div class="seg presets" role="group" aria-label="iOS CI"><button type="button" data-ci="0" aria-pressed="true">Self-hosted Mac</button><button type="button" data-ci="70">GitHub macOS</button></div></div>
+      <details class="adv"><summary>Assumptions</summary>
+        <div class="adv-grid">
+          <label>Flash in $/M<input id="pfi" type="number" step="0.01" value="1.50"></label>
+          <label>Flash out $/M<input id="pfo" type="number" step="0.01" value="7.50"></label>
+          <label>Flash-Lite in $/M<input id="pli" type="number" step="0.01" value="0.25"></label>
+          <label>Flash-Lite out $/M<input id="plo" type="number" step="0.01" value="1.50"></label>
+          <label>Input tokens / agent msg<input id="tin" type="number" step="100" value="4500"></label>
+          <label>Output tokens / agent msg<input id="tout" type="number" step="50" value="400"></label>
+          <label>Cached share of input<input id="cache" type="number" step="0.05" value="0.3"></label>
+          <label>₹ per $<input id="fx" type="number" step="0.5" value="88"></label>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-top:10px">A Gemini fallback is one request of about 1.5k tokens of instructions, 1.2k of tool schemas and 1.8k of group context, with no history. A scan fallback (30% of scans) is ~1.7k in / 900 out on Flash. A receipt fallback (40% of receipts) is ~2.5k in / 300 out on Flash-Lite, from 20 receipts per Gmail user. Firestore assumes 3,000 reads and 300 writes per user per month at $0.03 / $0.09 per 100k after the daily free quota. Voice option A (on-device speech) adds no AI cost.</p>
+      </details>
+    </div>
+    <div class="result">
+      <div class="total"><div><b id="tot-usd">$0</b><span> / month</span></div><div><b id="tot-inr" style="font-size:22px">₹0</b></div><span id="per-user"></span></div>
+      <div class="bars" id="bars" aria-label="Cost by component"></div>
+      <div class="callout warn" id="costNote"><p></p></div>
+    </div>
+  </div>
+  </details>
+</section>
+
+<!-- ============ DEPLOY ============ -->
+<section id="deploy">
+  <span class="eyebrow">11 · Deployment</span>
+  <h2>From merge to your friends' phones</h2>
+  <div class="grid3">
+    <div class="card"><h3>Local</h3><p>Firebase Emulator Suite (Auth, Firestore), Dart Frog dev server, <code>dev</code> flavor with App Check debug provider.</p></div>
+    <div class="card"><h3>kraken-dev</h3><p>Every merge to <code>main</code>: Android APK to you by App Distribution, rules and indexes deployed, API revision to Cloud Run dev. Evals run here, on dev's own Gemini quota.</p></div>
+    <div class="card"><h3>kraken-prod</h3><p>Tag <code>v*</code>: release APK to your friends by App Distribution; release iPhone build installed from your Mac; API to Cloud Run prod.</p></div>
+  </div>
+  <div class="pipeline">
+    <div class="step"><span class="when">every PR</span><b>Check</b>analyse, unit + widget tests, <code>ledger</code> and <code>intent</code> tests, rules tests in emulator, server tests</div>
+    <div class="step"><span class="when">merge to main</span><b>Ship to dev</b>Android APK on Ubuntu runner → App Distribution; <code>firebase deploy</code> rules; <code>gcloud run deploy</code></div>
+    <div class="step"><span class="when">nightly</span><b>Rules eval</b>60 prompts, 30 voice transcripts, 25 bills through rules only; no Gemini calls</div>
+    <div class="step"><span class="when">weekly</span><b>AI eval</b>Only the rule misses go to Gemini on <code>kraken-dev</code>, so prod's free quota is untouched</div>
+    <div class="step"><span class="when">tag v1.x</span><b>Release</b>APK to friends; <code>tool/ios_install.sh</code> runs <code>flutter run --release --flavor prod</code> on each connected iPhone</div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Free addresses</h3><ul>
+      <li><code>kraken-prod.web.app</code>: sign-in link domain, Android <code>assetlinks.json</code>, the iPhone sign-in bounce page, privacy page.</li>
+      <li><code>kraken-api-&lt;hash&gt;.asia-south1.run.app</code>: the Dart API, HTTPS included.</li>
+      <li>Both are fixed for the life of the project; put them in the flavor config, not in code.</li>
+    </ul></div>
+    <div class="card"><h3>Safety nets</h3><ul>
+      <li>GitHub → Google Cloud by Workload Identity Federation; no JSON keys.</li>
+      <li>Cloud Run revisions roll back in one command.</li>
+      <li>Remote Config switches: <code>ai_enabled</code>, voice, scan, Gmail, and the daily Gemini guard.</li>
+      <li>$1 budget alert on both projects; Crashlytics checked daily from Phase 8.</li>
+      <li>A calendar reminder every 6 days to re-install on the iPhones.</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ============ TIMELINE ============ -->
+<section id="timeline">
+  <span class="eyebrow">12 · Timeline</span>
+  <h2>About 16 weeks, phase by phase</h2>
+  <p>The rules work adds about 6½ days. Dropping the store work (closed test, listings, review) removes about the same, so friends start using Kraken at the start of week 15 and Gmail suggestions land in week 17.</p>
+  <div class="gantt"><div class="g-in" id="gantt"></div>
+    <div class="legend"><span><i style="background:var(--bar)"></i>Build phase</span><span><i style="background:var(--bar-2)"></i>Friends using it</span><span><i style="border:2px dashed var(--muted)"></i>Optional buffer</span></div>
+  </div>
+</section>
+
+<!-- ============ DECISIONS ============ -->
+<section id="decisions">
+  <span class="eyebrow">13 · Decisions needed</span>
+  <h2>Five calls for you to make</h2>
+  <div class="qs">
+    <div class="q"><span class="n">1</span><p><b>Cloud Run with a card on file, or Render with no card?</b> Cloud Run is recommended: $0 at this size, same Google project, quick first response. Render's free tier needs no card but is slow after idle.</p></div>
+    <div class="q"><span class="n">2</span><p><b>Are you and your friends OK with the free tier's data terms?</b> If not, the paid tier costs roughly ₹25 a month at five users and keeps prompts out of Google's training.</p></div>
+    <div class="q"><span class="n">3</span><p><b>When a rule is missing just one detail, ask first or go straight to Gemini?</b> Asking first is recommended: it's free and instant, and Gemini handles only messages the rules can't read at all.</p></div>
+    <div class="q"><span class="n">4</span><p><b>iPhone sign-in without Universal Links: bounce page or Google sign-in?</b> The bounce page keeps the chat email flow from the design. Google sign-in is simpler but changes the onboarding screen.</p></div>
+    <div class="q"><span class="n">5</span><p><b>Desktop screens later, as Flutter web?</b> The domain and rules layers carry over unchanged; only presentation is new.</p></div>
+  </div>
+  <h3>Sources</h3>
+  <ul class="src">
+    <li><a href="https://firebase.google.com/docs/functions/start-dart">Firebase: Dart in Cloud Functions (experimental)</a></li>
+    <li><a href="https://ai.google.dev/gemini-api/docs/pricing">Google: Gemini API pricing</a> (check before launch; third-party summaries disagree)</li>
+    <li><a href="https://cloud.google.com/firestore/pricing">Google Cloud: Firestore pricing</a></li>
+    <li><a href="https://ai.google.dev/gemini-api/docs/rate-limits">Google: Gemini API rate limits</a> (free-tier numbers are shown in AI Studio)</li>
+    <li><a href="https://discuss.ai.google.dev/t/clarification-on-gemini-api-free-tier-quota-reduction-and-paid-tier-stability/112941">Developer forum: free-tier quota reductions</a></li>
+    <li><a href="https://support.google.com/cloud/answer/13465431">Google: Security assessment for restricted scopes</a></li>
+    <li><a href="https://groups.google.com/g/google-apps-script-community/c/wlibwqM0hlg">Developer forum: CASA Tier 2 pricing reports</a></li>
+    <li><a href="https://developer.android.com/google/play/requirements/target-sdk">Android: target API level requirements</a></li>
+    <li><a href="https://developer.apple.com/news/upcoming-requirements/">Apple: upcoming App Store Connect requirements</a></li>
+  </ul>
+</section>
+</main>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const presets = {beta:{mau:100,msgs:40,flash:20,scans:3,gmail:30},launch:{mau:1000,msgs:30,flash:20,scans:3,gmail:30},growth:{mau:10000,msgs:25,flash:15,scans:2,gmail:25},scale:{mau:50000,msgs:25,flash:15,scans:2,gmail:25}};
+  const $$ = id => document.getElementById(id);
+  function freeTier(){
+    const v = id => parseFloat($$(id).value) || 0;
+    const p=v('fp'), c=v('fc'), r=v('fr')/100, s=v('fs'), o=v('fo')/100, gm=v('fg'), lim=v('fl');
+    const withRules = p*c*(1-r) + p*s/7*(1-o) + gm/7*0.4 + 1;
+    const without = p*c + p*s/7 + gm/7 + p*c*0.5;
+    const max = Math.max(withRules, without, lim);
+    const f = n => (Math.round(n*10)/10).toLocaleString('en-US');
+    $$('fq-req').textContent = f(withRules);
+    const pct = withRules/lim*100;
+    $$('fq-pct').innerHTML = '<span class="pill ' + (pct < 60 ? 'low">✓ Comfortable' : pct < 100 ? 'med">! Tight' : 'high">✕ Over the limit') + '</span> ' + Math.round(pct) + '% of the free limit';
+    [['a',withRules],['b',without],['l',lim]].forEach(([k,n]) => { $$('fq-bar-'+k).style.width = (n/max*100).toFixed(1)+'%'; $$('fq-val-'+k).textContent = f(n)+' / day'; });
+    $$('fq-note').querySelector('p').innerHTML = without > lim
+      ? 'Sending every request to Gemini would need <strong>' + f(without) + '</strong> a day, over the ' + f(lim) + ' limit. Rules first brings it to <strong>' + f(withRules) + '</strong>.'
+      : 'Even without rules this would fit today, but rules first leaves room for free-tier cuts and keeps most of your data on the phone.';
+    [['fp',''],['fc',''],['fr','%'],['fs',''],['fo','%'],['fg',''],['fl','']].forEach(([k,u]) => $$('o-'+k).textContent = v(k) + u);
+  }
+  ['fp','fc','fr','fs','fo','fg','fl'].forEach(id => $$(id).addEventListener('input', freeTier));
+  freeTier();
+  let ci = 0;
+  const usd = v => v >= 100 ? '$' + Math.round(v).toLocaleString('en-US') : '$' + v.toFixed(2);
+  const inr = v => '₹' + Math.round(v).toLocaleString('en-IN');
+  const num = id => parseFloat($(id).value) || 0;
+
+  function calc(){
+    const mau=num('mau'), msgs=num('msgs')*(1-num('rules')/100), fl=num('flash')/100, scans=num('scans')*0.3, gm=num('gmail')/100*0.4;
+    const pfi=num('pfi'), pfo=num('pfo'), pli=num('pli'), plo=num('plo'), tin=num('tin'), tout=num('tout'), c=Math.min(1,Math.max(0,num('cache'))), fx=num('fx');
+    const perMsg = (pi,po) => tin*((1-c)*pi + c*pi*0.1)/1e6 + tout*po/1e6;
+    const agent = mau*msgs*(fl*perMsg(pfi,pfo) + (1-fl)*perMsg(pli,plo));
+    const scan = mau*scans*(1700*pfi + 900*pfo)/1e6;
+    const gmailAi = mau*gm*20*(2500*pli + 300*plo)/1e6;
+    const cats = mau*15*(400*pli + 20*plo)/1e6;
+    const reads = Math.max(0, mau*3000 - 1.5e6), writes = Math.max(0, mau*300 - 6e5);
+    const fs = reads*0.03/1e5 + writes*0.09/1e5 + Math.max(0, mau*0.002 - 1)*0.18;
+    const run = Math.max(0, mau*40 - 2e6)*0.40/1e6 + Math.max(0, mau - 20000)*0.0008;
+    const auth = Math.max(0, mau - 50000)*0.0055;
+    const fixed = 99/12 + 1 + (gm > 0 ? 540/12 : 0) + 25/12;
+    const rows = [
+      ['Agent (Gemini)', agent, 'Rule misses sent to Gemini: '+Math.round(mau*msgs).toLocaleString('en-US')+' requests, '+Math.round(fl*100)+'% on Flash'],
+      ['Bill scans (Gemini)', scan, Math.round(mau*scans).toLocaleString('en-US')+' scans the on-device parser could not read'],
+      ['Receipts (Gemini)', gmailAi, Math.round(mau*gm*20).toLocaleString('en-US')+' receipts from unknown senders, on Flash-Lite'],
+      ['Categories (Gemini)', cats, 'One Flash-Lite call per new expense'],
+      ['Firestore', fs, 'Reads and writes beyond the free daily quota'],
+      ['Cloud Run + Auth', run + auth, 'API requests beyond the free tier; Auth is free below 50k MAU'],
+      ['iOS CI minutes', ci, ci ? 'GitHub-hosted macOS runners' : 'Self-hosted runner on your Mac'],
+      ['Fixed, per month', fixed, 'Apple, Play, domain' + (gm > 0 ? ', CASA (Gmail)' : '') + ', spread over 12 months']
+    ];
+    const total = rows.reduce((s,r)=>s+r[1],0);
+    const variable = total - fixed - ci;
+    $('tot-usd').textContent = usd(total);
+    $('tot-inr').textContent = inr(total*fx);
+    $('per-user').textContent = usd(variable/mau) + ' per active user, before fixed costs';
+    const max = Math.max(...rows.map(r=>r[1]), 0.01);
+    $('bars').innerHTML = rows.map(r => '<div class="brow" data-tip="'+r[2]+'"><span class="lbl">'+r[0]+'</span><span class="track"><span class="fill" style="width:'+(r[1]/max*100).toFixed(1)+'%"></span></span><span class="val">'+usd(r[1])+'</span></div>').join('');
+    const noRules = mau*num('msgs')*(fl*perMsg(pfi,pfo) + (1-fl)*perMsg(pli,plo));
+    $('costNote').querySelector('p').innerHTML = num('rules') > 0
+      ? 'Without the rule engine the agent line would be <strong>'+usd(noRules)+'</strong> instead of <strong>'+usd(agent)+'</strong>.'
+      : 'Every message goes to Gemini. Letting rules handle 75% would save about <strong>'+usd(noRules*0.75)+'</strong> a month.';
+    ['mau','msgs','scans'].forEach(k => $('o-'+k).textContent = num(k).toLocaleString('en-US'));
+    $('o-rules').textContent = num('rules') + '%';
+    $('o-flash').textContent = num('flash') + '%';
+    $('o-gmail').textContent = num('gmail') + '%';
+  }
+  document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+    const p = presets[b.dataset.preset]; Object.keys(p).forEach(k => $(k).value = p[k]);
+    document.querySelectorAll('[data-preset]').forEach(x => x.setAttribute('aria-pressed', x === b)); calc();
+  }));
+  document.querySelectorAll('[data-ci]').forEach(b => b.addEventListener('click', () => {
+    ci = +b.dataset.ci; document.querySelectorAll('[data-ci]').forEach(x => x.setAttribute('aria-pressed', x === b)); calc();
+  }));
+  document.querySelectorAll('.controls input').forEach(i => i.addEventListener('input', () => {
+    if (['fp','fc','fr','fs','fo','fg','fl'].includes(i.id)) return;
+    if (['mau','msgs','flash','scans','gmail'].includes(i.id)) document.querySelectorAll('[data-preset]').forEach(x => x.setAttribute('aria-pressed','false'));
+    calc();
+  }));
+  calc();
+
+  // Tooltip for bars and timeline
+  const tip = $('tip');
+  document.addEventListener('mousemove', e => {
+    const t = e.target.closest('[data-tip]');
+    if (!t) { tip.hidden = true; return; }
+    tip.textContent = t.dataset.tip; tip.hidden = false;
+    const x = Math.min(e.clientX + 14, window.innerWidth - 270);
+    tip.style.left = x + 'px'; tip.style.top = (e.clientY + 14) + 'px';
+  });
+
+  // Timeline (weeks 1-17; fractional weeks from the guide's calendar)
+  const phases = [
+    ['0 · Foundations', 1, 1, ''],
+    ['1 · Chat sign-in', 2, 1.6, ''],
+    ['2 · Groups & ledger', 3.6, 2, ''],
+    ['3 · Rules + AI agent', 5.6, 2.6, ''],
+    ['4 · Voice', 8.2, 1, ''],
+    ['5 · OCR + bill scan', 9.2, 1.8, ''],
+    ['6 · Settle & UPI', 11, 1.4, ''],
+    ['7 · Insights', 12.4, 1.1, ''],
+    ['8 · Hardening + install', 13.5, 1.4, ''],
+    ['Friends using Kraken', 14.9, 3.1, 'ext'],
+    ['9 · Gmail (your account)', 14.9, 2.2, ''],
+    ['Buffer week (optional)', 17, 1, 'ms']
+  ];
+  const g = $('gantt'); let h = '<div></div>';
+  for (let w=1; w<=17; w++) h += '<div class="g-h">W'+w+'</div>';
+  phases.forEach(([name, start, len, cls], i) => {
+    const row = i + 2;
+    const c0 = Math.floor(start) + 1, c1 = Math.min(19, Math.ceil(start + len) + 1);
+    const padL = ((start - Math.floor(start)) / (c1 - c0) * 100), w = (len / (c1 - c0) * 100);
+    h += '<div class="g-l" style="grid-row:'+row+'">'+name+'</div>';
+    h += '<div style="grid-row:'+row+';grid-column:'+c0+' / '+c1+';position:relative;height:16px"><div class="g-bar '+cls+'" data-tip="'+name+': week '+(Math.round(start*10)/10)+' to '+(Math.round((start+len)*10)/10)+'" style="position:absolute;left:'+padL+'%;width:'+w+'%;top:0;bottom:0"></div></div>';
+  });
+  g.innerHTML = h;
+})();
+</script>
