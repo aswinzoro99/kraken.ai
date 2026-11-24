@@ -35,51 +35,58 @@ class KTrendBars extends StatelessWidget {
     final k = context.k;
     final max = bars.fold<double>(0, (m, b) => b.value > m ? b.value : m);
     final duration = KMotion.of(context, KMotion.slow);
-    return Column(children: [
-      SizedBox(
-        height: height,
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          for (var i = 0; i < bars.length; i++)
-            Expanded(
-              child: _hit(
-                context,
-                i,
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: AnimatedContainer(
-                    duration: duration,
-                    curve: KMotion.curve,
-                    width: 20,
-                    height: max == 0 || bars[i].value <= 0 ? 0 : (bars[i].value / max * height).clamp(3, height),
-                    decoration: BoxDecoration(
-                      color: i == selected ? k.primary : k.chartMuted,
-                      // Rounded at the data end, square on the baseline.
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+    return Column(
+      children: [
+        SizedBox(
+          height: height,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (var i = 0; i < bars.length; i++)
+                Expanded(
+                  child: _hit(
+                    context,
+                    i,
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: AnimatedContainer(
+                        duration: duration,
+                        curve: KMotion.curve,
+                        width: 20,
+                        height: max == 0 || bars[i].value <= 0 ? 0 : (bars[i].value / max * height).clamp(3, height),
+                        decoration: BoxDecoration(
+                          color: i == selected ? k.primary : k.chartMuted,
+                          // Rounded at the data end, square on the baseline.
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Container(height: 1, color: k.line),
+        const SizedBox(height: KSpace.xs),
+        Row(
+          children: [
+            for (var i = 0; i < bars.length; i++)
+              Expanded(
+                child: ExcludeSemantics(
+                  child: Text(
+                    bars[i].label,
+                    textAlign: TextAlign.center,
+                    style: KText.small.copyWith(
+                      color: i == selected ? k.ink : k.muted,
+                      fontWeight: i == selected ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ),
               ),
-            ),
-        ]),
-      ),
-      Container(height: 1, color: k.line),
-      const SizedBox(height: KSpace.xs),
-      Row(children: [
-        for (var i = 0; i < bars.length; i++)
-          Expanded(
-            child: ExcludeSemantics(
-              child: Text(
-                bars[i].label,
-                textAlign: TextAlign.center,
-                style: KText.small.copyWith(
-                  color: i == selected ? k.ink : k.muted,
-                  fontWeight: i == selected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ),
-          ),
-      ]),
-    ]);
+          ],
+        ),
+      ],
+    );
   }
 
   Widget _hit(BuildContext context, int i, Widget child) {

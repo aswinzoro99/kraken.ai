@@ -19,13 +19,16 @@ void main() {
 
     test('categories are largest first and add up to the total', () {
       final c = home.spending.categories;
-      expect([for (final x in c) x.category], [
-        ExpenseCategory.rentBills,
-        ExpenseCategory.stays,
-        ExpenseCategory.foodDrinks,
-        ExpenseCategory.groceries,
-        ExpenseCategory.travel,
-      ]);
+      expect(
+        [for (final x in c) x.category],
+        [
+          ExpenseCategory.rentBills,
+          ExpenseCategory.stays,
+          ExpenseCategory.foodDrinks,
+          ExpenseCategory.groceries,
+          ExpenseCategory.travel,
+        ],
+      );
       expect([for (final x in c) x.amount.wholeRupees], [13200, 3000, 2140, 1690, 1470]);
       expect(Money.sum(c.map((x) => x.amount)), home.spending.total);
     });
@@ -60,14 +63,10 @@ void main() {
   group('balances', () {
     test('are per person across groups, people you owe first', () {
       final people = home.balances.people;
-      expect([for (final p in people) (p.name, p.amount.wholeRupees)], [
-        ('Meera', -1850),
-        ('Sreya', 1570),
-        ('Kavya', 1290),
-        ('Rohan', 890),
-        ('Arjun', 550),
-        ('Dev', 420),
-      ]);
+      expect(
+        [for (final p in people) (p.name, p.amount.wholeRupees)],
+        [('Meera', -1850), ('Sreya', 1570), ('Kavya', 1290), ('Rohan', 890), ('Arjun', 550), ('Dev', 420)],
+      );
       expect(people[1].groupNames, ['Goa Trip', 'Weekend trek']);
     });
 
@@ -82,12 +81,10 @@ void main() {
   });
 
   test('groups match the design balances, most recent first', () {
-    expect([for (final g in home.groups) (g.name, g.myBalance.wholeRupees)], [
-      ('Office lunch', 0),
-      ('Goa Trip', -150),
-      ('Flat 302', 2180),
-      ('Weekend trek', 840),
-    ]);
+    expect(
+      [for (final g in home.groups) (g.name, g.myBalance.wholeRupees)],
+      [('Office lunch', 0), ('Goa Trip', -150), ('Flat 302', 2180), ('Weekend trek', 840)],
+    );
   });
 
   test('recent activity mixes expenses and payments, newest first', () {
@@ -96,7 +93,10 @@ void main() {
     final lunch = r[1] as ExpenseActivity;
     expect((lunch.expense.description, lunch.yourEffect), ('Team lunch', const Money.rupees(-600)));
     final beach = r[2] as ExpenseActivity;
-    expect((beach.paidByYou, beach.yourEffect, beach.expense.source), (true, const Money.rupees(2100), ExpenseSource.scan));
+    expect(
+      (beach.paidByYou, beach.yourEffect, beach.expense.source),
+      (true, const Money.rupees(2100), ExpenseSource.scan),
+    );
   });
 
   test('no groups gives an empty, zeroed snapshot', () {

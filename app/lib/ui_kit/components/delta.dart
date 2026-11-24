@@ -24,11 +24,19 @@ class KDelta extends StatelessWidget {
     return Semantics(
       label: text,
       excludeSemantics: true,
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Flexible(child: Text(text, style: KText.caption.copyWith(color: color, fontWeight: FontWeight.w500))),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              style: KText.caption.copyWith(color: color, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

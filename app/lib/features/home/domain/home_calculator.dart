@@ -11,11 +11,7 @@ abstract final class HomeCalculator {
   static const trendMonths = 6;
   static const recentCount = 4;
 
-  static HomeSnapshot build({
-    required List<GroupLedger> ledgers,
-    required DateTime now,
-    DateTime? month,
-  }) {
+  static HomeSnapshot build({required List<GroupLedger> ledgers, required DateTime now, DateTime? month}) {
     final selected = _monthOf(month ?? now);
     return HomeSnapshot(
       spending: spending(ledgers, selected, now),
@@ -106,14 +102,16 @@ abstract final class HomeCalculator {
         (groupsOf[person] ??= []).add(l.group.name);
       });
     }
-    final people = [
-      for (final MapEntry(key: id, value: amount) in totals.entries)
-        if (!amount.isZero) PersonBalance(personId: id, name: names[id]!, amount: amount, groupNames: groupsOf[id]!),
-    ]..sort((a, b) {
-        // You owe first (they need action from you), then largest first.
-        if (a.amount.isNegative != b.amount.isNegative) return a.amount.isNegative ? -1 : 1;
-        return b.amount.abs().compareTo(a.amount.abs());
-      });
+    final people =
+        [
+          for (final MapEntry(key: id, value: amount) in totals.entries)
+            if (!amount.isZero)
+              PersonBalance(personId: id, name: names[id]!, amount: amount, groupNames: groupsOf[id]!),
+        ]..sort((a, b) {
+          // You owe first (they need action from you), then largest first.
+          if (a.amount.isNegative != b.amount.isNegative) return a.amount.isNegative ? -1 : 1;
+          return b.amount.abs().compareTo(a.amount.abs());
+        });
     return BalanceSummary(people);
   }
 
@@ -155,8 +153,11 @@ abstract final class HomeCalculator {
           memberCount: l.group.members.length,
           detail: l.group.detail,
           myBalance: Money.sum(
-            balancesWith(l.myMemberId, l.expenses.map((e) => e.toSplit()), l.payments.map((p) => p.toTransfer()))
-                .values,
+            balancesWith(
+              l.myMemberId,
+              l.expenses.map((e) => e.toSplit()),
+              l.payments.map((p) => p.toTransfer()),
+            ).values,
           ),
           lastActivity: l.lastActivity,
         ),

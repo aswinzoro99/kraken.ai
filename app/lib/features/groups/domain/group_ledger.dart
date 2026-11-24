@@ -3,7 +3,12 @@ import 'group.dart';
 
 /// A group with everything recorded in it.
 final class GroupLedger {
-  const GroupLedger({required this.group, required this.myMemberId, this.expenses = const [], this.payments = const []});
+  const GroupLedger({
+    required this.group,
+    required this.myMemberId,
+    this.expenses = const [],
+    this.payments = const [],
+  });
 
   final Group group;
 
@@ -14,9 +19,7 @@ final class GroupLedger {
 
   String nameOf(String memberId) => memberId == myMemberId
       ? 'You'
-      : group.members
-            .firstWhere((m) => m.id == memberId, orElse: () => Member(memberId, 'Someone'))
-            .name;
+      : group.members.firstWhere((m) => m.id == memberId, orElse: () => Member(memberId, 'Someone')).name;
 
   DateTime? get lastActivity {
     DateTime? latest;

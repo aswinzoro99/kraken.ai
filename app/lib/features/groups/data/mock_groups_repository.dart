@@ -34,12 +34,23 @@ const _priya = Member('priya', 'Priya');
 
 const goaTrip = Group(id: 'goa', name: 'Goa Trip', members: [_me, _sreya, _arjun, _meera]);
 const flat302 = Group(id: 'flat', name: 'Flat 302', members: [_me, _rohan, _kavya], detail: 'rent, wifi, groceries');
-const weekendTrek =
-    Group(id: 'trek', name: 'Weekend trek', members: [_me, _sreya, _arjun, _dev, _nisha], detail: 'Lonavala');
+const weekendTrek = Group(
+  id: 'trek',
+  name: 'Weekend trek',
+  members: [_me, _sreya, _arjun, _dev, _nisha],
+  detail: 'Lonavala',
+);
 const officeLunch = Group(
   id: 'lunch',
   name: 'Office lunch',
-  members: [_me, _priya, Member('rahul', 'Rahul'), Member('anjali', 'Anjali'), Member('vikram', 'Vikram'), Member('zoya', 'Zoya')],
+  members: [
+    _me,
+    _priya,
+    Member('rahul', 'Rahul'),
+    Member('anjali', 'Anjali'),
+    Member('vikram', 'Vikram'),
+    Member('zoya', 'Zoya'),
+  ],
 );
 
 List<GroupLedger> buildMockLedgers(DateTime now) {
@@ -142,21 +153,24 @@ class _Builder {
     ExpenseSource source = ExpenseSource.manual,
   ]) {
     final total = Money.rupees(rupees);
-    expenses.add(Expense(
-      id: 'e${_id++}',
-      groupId: g.id,
-      description: what,
-      date: date,
-      paidBy: payer,
-      total: total,
-      shares: splitEqually(total, [for (final m in g.members) m.id]),
-      category: category,
-      source: source,
-    ));
+    expenses.add(
+      Expense(
+        id: 'e${_id++}',
+        groupId: g.id,
+        description: what,
+        date: date,
+        paidBy: payer,
+        total: total,
+        shares: splitEqually(total, [for (final m in g.members) m.id]),
+        category: category,
+        source: source,
+      ),
+    );
   }
 
   void pay(Group g, String from, String to, int rupees, DateTime date) => payments.add(
-      Payment(id: 'p${_id++}', groupId: g.id, from: from, to: to, amount: Money.rupees(rupees), date: date));
+    Payment(id: 'p${_id++}', groupId: g.id, from: from, to: to, amount: Money.rupees(rupees), date: date),
+  );
 
   void beginMonth() {
     _monthStart = expenses.length;
@@ -175,14 +189,16 @@ class _Builder {
         monthPayments.where((p) => p.groupId == groupId).map((p) => p.toTransfer()),
       );
       owed.forEach((person, amount) {
-        payments.add(Payment(
-          id: 'p${_id++}',
-          groupId: groupId,
-          from: amount.isPositive ? person : 'me',
-          to: amount.isPositive ? 'me' : person,
-          amount: amount.abs(),
-          date: date,
-        ));
+        payments.add(
+          Payment(
+            id: 'p${_id++}',
+            groupId: groupId,
+            from: amount.isPositive ? person : 'me',
+            to: amount.isPositive ? 'me' : person,
+            amount: amount.abs(),
+            date: date,
+          ),
+        );
       });
     }
   }

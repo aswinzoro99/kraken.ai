@@ -14,10 +14,13 @@ class ActivitySection extends StatelessWidget {
   final VoidCallback onSeeAll;
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-    KSectionHeader(title: 'Recent activity', actionLabel: 'See all', onAction: onSeeAll),
-    KGroupedList(indent: 52, children: [for (final item in items) _ActivityRow(item)]),
-  ]);
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      KSectionHeader(title: 'Recent activity', actionLabel: 'See all', onAction: onSeeAll),
+      KGroupedList(indent: 52, children: [for (final item in items) _ActivityRow(item)]),
+    ],
+  );
 }
 
 class _ActivityRow extends StatelessWidget {
@@ -64,29 +67,51 @@ class _ActivityRow extends StatelessWidget {
     return MergeSemantics(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: KSpace.sm),
-        child: Row(children: [
-          _DateBlock(item.date),
-          const SizedBox(width: KSpace.md),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Flexible(
-                  child: Text(title, style: KText.bodyStrong.copyWith(color: k.ink), overflow: TextOverflow.ellipsis),
-                ),
-                if (tag != null) ...[
-                  const SizedBox(width: 6),
-                  Semantics(label: tag.$2, child: Icon(tag.$1, size: 14, color: k.muted)),
+        child: Row(
+          children: [
+            _DateBlock(item.date),
+            const SizedBox(width: KSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: KText.bodyStrong.copyWith(color: k.ink),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (tag != null) ...[
+                        const SizedBox(width: 6),
+                        Semantics(
+                          label: tag.$2,
+                          child: Icon(tag.$1, size: 14, color: k.muted),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    subtitle,
+                    style: KText.small.copyWith(color: k.muted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
-              ]),
-              Text(subtitle, style: KText.small.copyWith(color: k.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ]),
-          ),
-          const SizedBox(width: KSpace.sm),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            if (effectWords.isNotEmpty) Text(effectWords, style: KText.small.copyWith(color: effectColor)),
-            if (effectAmount.isNotEmpty) Text(effectAmount, style: KText.amount.copyWith(color: effectColor)),
-          ]),
-        ]),
+              ),
+            ),
+            const SizedBox(width: KSpace.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (effectWords.isNotEmpty) Text(effectWords, style: KText.small.copyWith(color: effectColor)),
+                if (effectAmount.isNotEmpty) Text(effectAmount, style: KText.amount.copyWith(color: effectColor)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -105,13 +130,15 @@ class _DateBlock extends StatelessWidget {
       excludeSemantics: true,
       child: SizedBox(
         width: 40,
-        child: Column(children: [
-          Text(
-            DateFormat.MMM().format(date).toUpperCase(),
-            style: KText.tiny.copyWith(color: k.muted, letterSpacing: 0.6),
-          ),
-          Text('${date.day}', style: KText.heading.copyWith(color: k.ink, height: 1.2)),
-        ]),
+        child: Column(
+          children: [
+            Text(
+              DateFormat.MMM().format(date).toUpperCase(),
+              style: KText.tiny.copyWith(color: k.muted, letterSpacing: 0.6),
+            ),
+            Text('${date.day}', style: KText.heading.copyWith(color: k.ink, height: 1.2)),
+          ],
+        ),
       ),
     );
   }

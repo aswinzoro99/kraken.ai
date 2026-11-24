@@ -28,41 +28,50 @@ class KShareRow extends StatelessWidget {
       excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(children: [
-          Expanded(
-            flex: 6,
-            child: Text(label, style: KText.caption.copyWith(color: k.ink), maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-          const SizedBox(width: KSpace.sm),
-          Expanded(
-            flex: 5,
-            child: LayoutBuilder(
-              builder: (context, c) => Stack(children: [
-                Container(
-                  height: 4,
-                  decoration: BoxDecoration(color: k.surfaceMuted, borderRadius: BorderRadius.circular(2)),
-                ),
-                AnimatedContainer(
-                  duration: KMotion.of(context, KMotion.slow),
-                  curve: KMotion.curve,
-                  height: 4,
-                  width: c.maxWidth * share.clamp(0, 1),
-                  decoration: BoxDecoration(color: k.primary, borderRadius: BorderRadius.circular(2)),
-                ),
-              ]),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 6,
+              child: Text(
+                label,
+                style: KText.caption.copyWith(color: k.ink),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
-          const SizedBox(width: KSpace.sm),
-          ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 64),
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              softWrap: false,
-              style: KText.caption.copyWith(color: k.ink, fontWeight: FontWeight.w500),
+            const SizedBox(width: KSpace.sm),
+            Expanded(
+              flex: 5,
+              child: LayoutBuilder(
+                builder: (context, c) => Stack(
+                  children: [
+                    Container(
+                      height: 4,
+                      decoration: BoxDecoration(color: k.surfaceMuted, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    AnimatedContainer(
+                      duration: KMotion.of(context, KMotion.slow),
+                      curve: KMotion.curve,
+                      height: 4,
+                      width: c.maxWidth * share.clamp(0, 1),
+                      decoration: BoxDecoration(color: k.primary, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ]),
+            const SizedBox(width: KSpace.sm),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 64),
+              child: Text(
+                value,
+                textAlign: TextAlign.end,
+                softWrap: false,
+                style: KText.caption.copyWith(color: k.ink, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
