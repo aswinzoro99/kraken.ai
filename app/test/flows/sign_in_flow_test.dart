@@ -156,4 +156,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(barHeight(), KBottomNav.height);
   });
+
+  testWidgets('Appearance in Account switches the theme and is kept after a restart', (tester) async {
+    final first = await pumpKraken(tester);
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    await say(tester, 'aarav@example.com');
+    await say(tester, first.inbox.value!.code);
+    await say(tester, 'Aarav');
+    await chip(tester, "Yes, I'm 18 or older");
+    await chip(tester, 'I agree');
+    await chip(tester, 'Yes, share usage stats');
+    await chip(tester, 'Skip for now');
+    await chip(tester, 'Skip for now');
+    await tester.tap(find.text('Open your groups'));
+    await tester.pumpAndSettle();
+
+    ThemeMode? mode() => tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode;
+    expect(mode(), ThemeMode.system);
+
+    await tester.tap(find.bySemanticsLabel('Account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Dark'));
+    await tester.pumpAndSettle();
+    expect(mode(), ThemeMode.dark);
+    expect(Theme.of(tester.element(find.text('Appearance'))).brightness, Brightness.dark);
+    final event = first.services.recorder.events.lastWhere((e) => e.name == 'appearance_changed');
+    expect(event.params, {'appearance': 'dark'});
+
+    // Restart on the same storage: still dark.
+    await tester.pumpWidget(const SizedBox());
+    await pumpKraken(tester, store: first.store);
+    expect(mode(), ThemeMode.dark);
+  });
 }

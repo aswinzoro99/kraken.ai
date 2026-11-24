@@ -15,6 +15,7 @@ export 'components/k_bottom_nav.dart';
 export 'components/k_button.dart';
 export 'components/k_card.dart';
 export 'components/k_chip.dart';
+export 'components/k_segmented.dart';
 export 'components/k_top_bar.dart';
 export 'components/quick_actions.dart';
 export 'components/rolling_number.dart';

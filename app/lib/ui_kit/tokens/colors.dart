@@ -8,6 +8,7 @@ final class KColors extends ThemeExtension<KColors> {
     required this.background,
     required this.surface,
     required this.surfaceMuted,
+    required this.surfaceRaised,
     required this.ink,
     required this.inkSecondary,
     required this.muted,
@@ -46,6 +47,9 @@ final class KColors extends ThemeExtension<KColors> {
   final Color background;
   final Color surface;
   final Color surfaceMuted;
+
+  /// A control raised off [surfaceMuted], like a segmented control's thumb.
+  final Color surfaceRaised;
   final Color ink;
   final Color inkSecondary;
   final Color muted;
@@ -97,6 +101,7 @@ final class KColors extends ThemeExtension<KColors> {
     background: Color(0xFFFFFFFF),
     surface: Color(0xFFFFFFFF),
     surfaceMuted: Color(0xFFF4F5F7),
+    surfaceRaised: Color(0xFFFFFFFF),
     ink: Color(0xFF15171C),
     inkSecondary: Color(0xFF4B5260),
     muted: Color(0xFF626873),
@@ -137,6 +142,7 @@ final class KColors extends ThemeExtension<KColors> {
     background: Color(0xFF0E1014),
     surface: Color(0xFF0E1014),
     surfaceMuted: Color(0xFF1A1D24),
+    surfaceRaised: Color(0xFF343947),
     ink: Color(0xFFE9EBF0),
     inkSecondary: Color(0xFFBCC2CD),
     muted: Color(0xFF949BA8),

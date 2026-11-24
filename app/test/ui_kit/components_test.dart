@@ -100,4 +100,24 @@ void main() {
     expect(KAvatar.initialsOf('  '), '?');
     expect(KAvatar.toneFor('Goa Trip'), KAvatar.toneFor('Goa Trip'));
   });
+
+  testWidgets('KSegmentedControl picks an option with a selection tick', (tester) async {
+    final picked = <String>[];
+    final engine = await pumpKit(
+      tester,
+      KSegmentedControl<String>(
+        segments: const [KSegment('a', 'Alpha'), KSegment('b', 'Beta')],
+        value: 'a',
+        onChanged: picked.add,
+      ),
+    );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Alpha')),
+      isSemantics(label: 'Alpha', isButton: true, isSelected: true, isInMutuallyExclusiveGroup: true),
+    );
+    await tester.tap(find.bySemanticsLabel('Alpha')); // Already chosen: nothing happens.
+    await tester.tap(find.bySemanticsLabel('Beta'));
+    expect(picked, ['b']);
+    expect(engine.played, [HapticKind.selection]);
+  });
 }

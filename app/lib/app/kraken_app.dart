@@ -13,6 +13,7 @@ import '../features/auth/domain/auth_repository.dart';
 import '../features/groups/domain/group_ledger.dart';
 import '../features/profile/domain/profile_repository.dart';
 import '../ui_kit/ui_kit.dart';
+import 'appearance.dart';
 import 'router.dart';
 import 'services.dart';
 import 'session.dart';
@@ -38,6 +39,7 @@ class _KrakenAppState extends State<KrakenApp> {
     policyVersion: s.config.privacyPolicyVersion,
   );
   late final AnalyticsConsentCubit _consent = AnalyticsConsentCubit(s.analytics);
+  late final AppearanceCubit _appearance = AppearanceCubit(s.store);
   late final StreamListenable _refresh = StreamListenable(_session.stream);
   late final GoRouter _router = createRouter(
     session: _session,
@@ -52,6 +54,7 @@ class _KrakenAppState extends State<KrakenApp> {
     _refresh.dispose();
     _session.close();
     _consent.close();
+    _appearance.close();
     super.dispose();
   }
 
@@ -74,22 +77,31 @@ class _KrakenAppState extends State<KrakenApp> {
         providers: [
           BlocProvider<SessionCubit>.value(value: _session),
           BlocProvider<AnalyticsConsentCubit>.value(value: _consent),
+          BlocProvider<AppearanceCubit>.value(value: _appearance),
         ],
-        child: MaterialApp.router(
-          title: s.config.appName,
-          debugShowCheckedModeBanner: false,
-          theme: KrakenTheme.light(),
-          darkTheme: KrakenTheme.dark(),
-          routerConfig: _router,
-          builder: (context, child) {
-            // Honour large text, but cap it where layouts would break (200%,
-            // the accessibility target in the build guide).
-            final media = MediaQuery.of(context);
-            return MediaQuery(
-              data: media.copyWith(textScaler: media.textScaler.clamp(maxScaleFactor: 2)),
-              child: HapticsScope(haptics: s.haptics, child: child ?? const SizedBox.shrink()),
-            );
-          },
+        child: BlocBuilder<AppearanceCubit, Appearance>(
+          builder: (context, appearance) => MaterialApp.router(
+            title: s.config.appName,
+            debugShowCheckedModeBanner: false,
+            theme: KrakenTheme.light(),
+            darkTheme: KrakenTheme.dark(),
+            // Account → Appearance; the phone's setting unless overridden.
+            themeMode: switch (appearance) {
+              Appearance.system => ThemeMode.system,
+              Appearance.light => ThemeMode.light,
+              Appearance.dark => ThemeMode.dark,
+            },
+            routerConfig: _router,
+            builder: (context, child) {
+              // Honour large text, but cap it where layouts would break (200%,
+              // the accessibility target in the build guide).
+              final media = MediaQuery.of(context);
+              return MediaQuery(
+                data: media.copyWith(textScaler: media.textScaler.clamp(maxScaleFactor: 2)),
+                child: HapticsScope(haptics: s.haptics, child: child ?? const SizedBox.shrink()),
+              );
+            },
+          ),
         ),
       ),
     );

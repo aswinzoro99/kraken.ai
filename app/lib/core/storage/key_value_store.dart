@@ -14,6 +14,7 @@ abstract interface class KeyValueStore {
 /// Keys used across the app, in one place so nothing collides.
 abstract final class StoreKeys {
   static const hapticsEnabled = 'settings.haptics_enabled';
+  static const appearance = 'settings.appearance';
   static const analyticsConsent = 'privacy.analytics_consent';
   static const pendingEmail = 'auth.pending_email';
   static const mockSession = 'mock.session';

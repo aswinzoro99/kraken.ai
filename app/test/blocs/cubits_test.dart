@@ -1,5 +1,7 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kraken/core/storage/key_value_store.dart';
+import 'package:kraken/app/appearance.dart';
 import 'package:kraken/app/services.dart';
 import 'package:kraken/app/session.dart';
 import 'package:kraken/core/analytics/analytics_consent_cubit.dart';
@@ -112,6 +114,33 @@ void main() {
       },
       expect: () => [AnalyticsConsent.granted, AnalyticsConsent.denied],
       verify: (_) => expect(services.recorder.names.last, 'setting_changed'),
+    );
+  });
+
+  group('AppearanceCubit', () {
+    test('follows the phone until a choice is saved', () async {
+      for (final (saved, expected) in [
+        (null, Appearance.system),
+        ('light', Appearance.light),
+        ('dark', Appearance.dark),
+        ('sepia', Appearance.system),
+      ]) {
+        final cubit = AppearanceCubit(MemoryStore({StoreKeys.appearance: ?saved}));
+        expect(cubit.state, expected, reason: '$saved');
+        await cubit.close();
+      }
+    });
+
+    final store = MemoryStore();
+    blocTest<AppearanceCubit, Appearance>(
+      'a choice applies at once and is saved for next time',
+      build: () => AppearanceCubit(store),
+      act: (cubit) async {
+        await cubit.set(Appearance.dark);
+        await cubit.set(Appearance.dark);
+      },
+      expect: () => [Appearance.dark],
+      verify: (_) => expect(store.getString(StoreKeys.appearance), 'dark'),
     );
   });
 }

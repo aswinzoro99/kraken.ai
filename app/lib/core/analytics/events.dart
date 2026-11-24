@@ -130,6 +130,17 @@ final class SettingChanged extends AnalyticsEvent {
   Map<String, Object> get params => {'setting': setting, 'enabled': enabled};
 }
 
+final class AppearanceChanged extends AnalyticsEvent {
+  const AppearanceChanged(this.appearance);
+
+  /// `system`, `light` or `dark`.
+  final String appearance;
+  @override
+  String get name => 'appearance_changed';
+  @override
+  Map<String, Object> get params => {'appearance': appearance};
+}
+
 final class ComingSoonTapped extends AnalyticsEvent {
   const ComingSoonTapped(this.feature);
   final String feature;

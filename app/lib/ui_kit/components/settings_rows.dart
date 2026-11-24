@@ -6,6 +6,7 @@ import '../foundation/pressable.dart';
 import '../theme/kraken_theme.dart';
 import '../tokens/layout.dart';
 import '../tokens/typography.dart';
+import 'k_segmented.dart';
 
 /// A settings row with a switch. The whole row toggles.
 class KSwitchRow extends StatelessWidget {
@@ -50,6 +51,42 @@ class KSwitchRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// A settings row that picks one of a few options, with a segmented
+/// control under the title.
+class KChoiceRow<T> extends StatelessWidget {
+  const KChoiceRow({
+    super.key,
+    required this.title,
+    required this.segments,
+    required this.value,
+    required this.onChanged,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<KSegment<T>> segments;
+  final T value;
+  final ValueChanged<T> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: KSpace.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(title, style: KText.bodyStrong.copyWith(color: k.ink)),
+          if (subtitle != null) Text(subtitle!, style: KText.caption.copyWith(color: k.muted)),
+          const SizedBox(height: KSpace.sm),
+          KSegmentedControl<T>(segments: segments, value: value, onChanged: onChanged),
+        ],
       ),
     );
   }

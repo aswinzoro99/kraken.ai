@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../app/appearance.dart';
 import '../../../app/routes.dart';
 import '../../../app/session.dart';
 import '../../../app/kraken_app.dart';
@@ -13,7 +14,8 @@ import '../../../ui_kit/ui_kit.dart';
 import '../../auth/domain/auth_repository.dart';
 import '../../profile/domain/profile_repository.dart';
 
-/// Account: who you are, privacy and feel settings, sign out and delete.
+/// Account: who you are, appearance, privacy and feel settings, sign out
+/// and delete.
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
 
@@ -127,6 +129,22 @@ class _AccountScreenState extends State<AccountScreen> {
               const KSectionHeader(title: 'Preferences'),
               KGroupedList(
                 children: [
+                  BlocBuilder<AppearanceCubit, Appearance>(
+                    builder: (context, appearance) => KChoiceRow<Appearance>(
+                      title: 'Appearance',
+                      subtitle: 'System matches your phone’s setting',
+                      segments: const [
+                        KSegment(Appearance.system, 'System'),
+                        KSegment(Appearance.light, 'Light'),
+                        KSegment(Appearance.dark, 'Dark'),
+                      ],
+                      value: appearance,
+                      onChanged: (choice) {
+                        context.read<AppearanceCubit>().set(choice);
+                        context.analytics.log(AppearanceChanged(choice.name));
+                      },
+                    ),
+                  ),
                   ValueListenableBuilder<bool>(
                     valueListenable: haptics.enabled,
                     builder: (context, on, _) => KSwitchRow(
