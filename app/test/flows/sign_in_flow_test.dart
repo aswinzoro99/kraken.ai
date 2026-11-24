@@ -189,4 +189,62 @@ void main() {
     await pumpKraken(tester, store: first.store);
     expect(mode(), ThemeMode.dark);
   });
+
+  testWidgets('Home: a welcome, a chart toggle that is remembered, and pull to refresh', (tester) async {
+    final first = await pumpKraken(tester);
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    await say(tester, 'aarav@example.com');
+    await say(tester, first.inbox.value!.code);
+    await say(tester, 'Aarav');
+    await chip(tester, "Yes, I'm 18 or older");
+    await chip(tester, 'I agree');
+    await chip(tester, 'Yes, share usage stats');
+    await chip(tester, 'Skip for now');
+    await chip(tester, 'Skip for now');
+    await tester.tap(find.text('Open your groups'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome, Aarav'), findsOneWidget);
+    expect(find.byType(KTrendBars), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Line chart'));
+    await tester.pumpAndSettle();
+    expect(find.byType(KTrendLine), findsOneWidget);
+    expect(find.byType(KTrendBars), findsNothing);
+
+    // Pull down past the line: the kraken arms, refreshes, then says so.
+    final pull = await tester.startGesture(tester.getCenter(find.text('Welcome, Aarav')));
+    for (var i = 0; i < 20; i++) {
+      await pull.moveBy(const Offset(0, 15));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(find.text('Release to refresh'), findsOneWidget);
+    await pull.up();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Refreshing…'), findsOneWidget);
+    // Step through the refresh, noting each label as it changes.
+    final seen = <String>[];
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      for (final label in ['Refreshing…', 'Up to date', 'Pull down to refresh']) {
+        if (find.text(label).evaluate().isNotEmpty && (seen.isEmpty || seen.last != label)) seen.add(label);
+      }
+    }
+    expect(seen, containsAllInOrder(['Refreshing…', 'Up to date']));
+    await tester.pumpAndSettle();
+    expect(find.text('Up to date'), findsNothing);
+    expect(find.text('Spent so far in November'), findsOneWidget);
+
+    final actions = [
+      for (final e in first.services.recorder.events)
+        if (e.name == 'home_action') e.params['action'],
+    ];
+    expect(actions, containsAllInOrder(['chart_line', 'refresh']));
+    expect(first.haptics.played, containsAllInOrder([HapticKind.selection, HapticKind.success]));
+
+    // Restart on the same storage: still the line chart.
+    await tester.pumpWidget(const SizedBox());
+    await pumpKraken(tester, store: first.store);
+    expect(find.byType(KTrendLine), findsOneWidget);
+  });
 }

@@ -120,4 +120,74 @@ void main() {
     expect(picked, ['b']);
     expect(engine.played, [HapticKind.selection]);
   });
+
+  testWidgets('KThemePicker picks a theme from its preview tiles', (tester) async {
+    final picked = <String>[];
+    final engine = await pumpKit(
+      tester,
+      SizedBox(
+        width: 360,
+        child: KThemePicker<String>(
+          choices: const [
+            KThemeChoice('system', 'System', KThemePreview.split),
+            KThemeChoice('light', 'Light', KThemePreview.light),
+            KThemeChoice('dark', 'Dark', KThemePreview.dark),
+          ],
+          value: 'system',
+          onChanged: picked.add,
+        ),
+      ),
+    );
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('System')),
+      isSemantics(label: 'System', isButton: true, isSelected: true, isInMutuallyExclusiveGroup: true),
+    );
+    await tester.tap(find.bySemanticsLabel('System')); // Already chosen: nothing happens.
+    await tester.tap(find.bySemanticsLabel('Dark'));
+    expect(picked, ['dark']);
+    expect(engine.played, [HapticKind.selection]);
+  });
+
+  testWidgets('a compact KSegmentedControl shows icons, named for screen readers', (tester) async {
+    final picked = <int>[];
+    await pumpKit(
+      tester,
+      KSegmentedControl<int>(
+        compact: true,
+        segments: const [
+          KSegment(0, 'Bar chart', icon: Icons.bar_chart_rounded),
+          KSegment(1, 'Line chart', icon: Icons.show_chart_rounded),
+        ],
+        value: 0,
+        onChanged: picked.add,
+      ),
+    );
+    expect(find.text('Line chart'), findsNothing);
+    expect(find.byIcon(Icons.show_chart_rounded), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('Line chart'));
+    expect(picked, [1]);
+  });
+
+  testWidgets('KTrendLine selects a month when tapped', (tester) async {
+    final picked = <int>[];
+    await pumpKit(
+      tester,
+      SizedBox(
+        width: 300,
+        child: KTrendLine(
+          selected: 2,
+          onSelect: picked.add,
+          points: const [
+            KBarDatum(label: 'Sep', value: 10, semanticLabel: 'September, ₹10'),
+            KBarDatum(label: 'Oct', value: 30, semanticLabel: 'October, ₹30'),
+            KBarDatum(label: 'Nov', value: 20, semanticLabel: 'November, ₹20'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('November, ₹20, selected'), findsOneWidget);
+    await tester.tap(find.bySemanticsLabel('October, ₹30'));
+    expect(picked, [1]);
+  });
 }

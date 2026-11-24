@@ -68,23 +68,7 @@ class KTrendBars extends StatelessWidget {
         ),
         Container(height: 1, color: k.line),
         const SizedBox(height: KSpace.xs),
-        Row(
-          children: [
-            for (var i = 0; i < bars.length; i++)
-              Expanded(
-                child: ExcludeSemantics(
-                  child: Text(
-                    bars[i].label,
-                    textAlign: TextAlign.center,
-                    style: KText.small.copyWith(
-                      color: i == selected ? k.ink : k.muted,
-                      fontWeight: i == selected ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        KTrendAxis(labels: [for (final b in bars) b.label], selected: selected),
       ],
     );
   }
@@ -99,6 +83,37 @@ class KTrendBars extends StatelessWidget {
       semanticLabel: label,
       excludeChildSemantics: true,
       child: child,
+    );
+  }
+}
+
+/// The month labels under a trend chart; the selected one is bold, so the
+/// choice isn't shown by colour alone. Screen readers get the marks instead.
+class KTrendAxis extends StatelessWidget {
+  const KTrendAxis({super.key, required this.labels, required this.selected});
+
+  final List<String> labels;
+  final int selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Expanded(
+              child: Text(
+                labels[i],
+                textAlign: TextAlign.center,
+                style: KText.small.copyWith(
+                  color: i == selected ? k.ink : k.muted,
+                  fontWeight: i == selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

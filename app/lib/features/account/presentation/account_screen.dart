@@ -129,20 +129,29 @@ class _AccountScreenState extends State<AccountScreen> {
               const KSectionHeader(title: 'Preferences'),
               KGroupedList(
                 children: [
-                  BlocBuilder<AppearanceCubit, Appearance>(
-                    builder: (context, appearance) => KChoiceRow<Appearance>(
-                      title: 'Appearance',
-                      subtitle: 'System matches your phone’s setting',
-                      segments: const [
-                        KSegment(Appearance.system, 'System'),
-                        KSegment(Appearance.light, 'Light'),
-                        KSegment(Appearance.dark, 'Dark'),
+                  Padding(
+                    padding: const EdgeInsets.only(top: KSpace.sm, bottom: KSpace.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text('Appearance', style: KText.bodyStrong.copyWith(color: k.ink)),
+                        Text('System matches your phone’s setting', style: KText.caption.copyWith(color: k.muted)),
+                        const SizedBox(height: KSpace.md),
+                        BlocBuilder<AppearanceCubit, Appearance>(
+                          builder: (context, appearance) => KThemePicker<Appearance>(
+                            choices: const [
+                              KThemeChoice(Appearance.system, 'System', KThemePreview.split),
+                              KThemeChoice(Appearance.light, 'Light', KThemePreview.light),
+                              KThemeChoice(Appearance.dark, 'Dark', KThemePreview.dark),
+                            ],
+                            value: appearance,
+                            onChanged: (choice) {
+                              context.read<AppearanceCubit>().set(choice);
+                              context.analytics.log(AppearanceChanged(choice.name));
+                            },
+                          ),
+                        ),
                       ],
-                      value: appearance,
-                      onChanged: (choice) {
-                        context.read<AppearanceCubit>().set(choice);
-                        context.analytics.log(AppearanceChanged(choice.name));
-                      },
                     ),
                   ),
                   ValueListenableBuilder<bool>(

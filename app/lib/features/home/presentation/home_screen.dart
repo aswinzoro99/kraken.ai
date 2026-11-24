@@ -42,6 +42,10 @@ class _HomeView extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<HomeCubit>().state;
     final now = context.read<Clock>()();
+    final name = switch (context.watch<SessionCubit>().state) {
+      ReadySession(:final profile) => profile.displayName,
+      _ => null,
+    };
 
     void track(String action, {int? monthsAgo}) => context.analytics.log(HomeAction(action, monthsAgo: monthsAgo));
     void soon(String feature, String message) {
@@ -97,6 +101,7 @@ class _HomeView extends StatelessWidget {
                   track('open_insights');
                   context.go(Paths.insights);
                 },
+                onChartChanged: (style) => track('chart_$style'),
               ),
               const SizedBox(height: KSpace.xxxl),
               BalancesSection(
@@ -145,31 +150,52 @@ class _HomeView extends StatelessWidget {
       ],
     };
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: KTopBar(
-            leading: const KrakenLogo(fontSize: 20),
-            actions: [
-              KIconButton(
-                icon: Icons.search_rounded,
-                label: 'Search',
-                onPressed: () => soon('search', 'Search arrives in Phase 2.'),
-              ),
-              KIconButton(
-                icon: Icons.group_add_outlined,
-                label: 'New group',
-                onPressed: () => soon('new_group', 'Creating groups arrives in Phase 2.'),
-              ),
-            ],
+    Future<void> refresh() async {
+      track('refresh');
+      final ok = await context.read<HomeCubit>().refresh();
+      if (!ok && context.mounted) KToast.show(context, "Couldn't refresh. Check your connection.");
+    }
+
+    return KrakenRefresh(
+      onRefresh: refresh,
+      child: CustomScrollView(
+        // Clamped, so pulling at the top opens the kraken's space instead of
+        // also bouncing the list.
+        physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+        slivers: [
+          SliverToBoxAdapter(
+            child: KTopBar(
+              leading: const KrakenLogo(fontSize: 20),
+              actions: [
+                KIconButton(
+                  icon: Icons.search_rounded,
+                  label: 'Search',
+                  onPressed: () => soon('search', 'Search arrives in Phase 2.'),
+                ),
+                KIconButton(
+                  icon: Icons.group_add_outlined,
+                  label: 'New group',
+                  onPressed: () => soon('new_group', 'Creating groups arrives in Phase 2.'),
+                ),
+              ],
+            ),
           ),
-        ),
-        ...content,
-        // Room to scroll the last row clear of the floating glass tab bar
-        // (its height is in the bottom padding, since the shell extends the
-        // body under it).
-        SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + KSpace.xl)),
-      ],
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.gutter, 0, KSpace.gutter, KSpace.sm),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: KTag(icon: Icons.waving_hand_rounded, label: name == null ? 'Welcome' : 'Welcome, $name'),
+              ),
+            ),
+          ),
+          ...content,
+          // Room to scroll the last row clear of the floating glass tab bar
+          // (its height is in the bottom padding, since the shell extends the
+          // body under it).
+          SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + KSpace.xl)),
+        ],
+      ),
     );
   }
 }

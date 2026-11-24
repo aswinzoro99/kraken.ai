@@ -30,7 +30,9 @@ final class HomeReady extends HomeState {
 /// Home: follows the person's groups and works out the dashboard.
 class HomeCubit extends Cubit<HomeState> {
   HomeCubit({required GroupsRepository repository, required String uid, required this._clock})
-    : super(const HomeLoading()) {
+    : _repository = repository,
+      _uid = uid,
+      super(const HomeLoading()) {
     _sub = repository.watchLedgers(uid).listen((ledgers) {
       _ledgers = ledgers;
       _emit();
@@ -38,6 +40,8 @@ class HomeCubit extends Cubit<HomeState> {
   }
 
   final Clock _clock;
+  final GroupsRepository _repository;
+  final String _uid;
   late final StreamSubscription<List<GroupLedger>> _sub;
   List<GroupLedger> _ledgers = const [];
   DateTime? _month;
@@ -48,6 +52,18 @@ class HomeCubit extends Cubit<HomeState> {
     if (month.isAfter(DateTime(now.year, now.month))) return;
     _month = month;
     _emit();
+  }
+
+  /// Fetches the groups again (pull to refresh). False if that failed;
+  /// what's on screen stays as it was.
+  Future<bool> refresh() async {
+    try {
+      _ledgers = await _repository.watchLedgers(_uid).first;
+      _emit();
+      return true;
+    } on Object {
+      return false;
+    }
   }
 
   void _emit() {

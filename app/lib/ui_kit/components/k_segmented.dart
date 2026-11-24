@@ -8,20 +8,34 @@ import '../tokens/typography.dart';
 
 /// One option in a [KSegmentedControl].
 final class KSegment<T> {
-  const KSegment(this.value, this.label);
+  const KSegment(this.value, this.label, {this.icon});
   final T value;
+
+  /// Shown; with an [icon], read by screen readers instead.
   final String label;
+
+  /// Shows this icon instead of the label, for compact toggles.
+  final IconData? icon;
 }
 
 /// Pick one of a few options: a track with a thumb that slides to the
 /// chosen one, iOS-style. Each option reads as a button in a group, marked
 /// selected, so screen readers announce it like a radio button.
+///
+/// [compact] sizes it to its content, for an icon toggle beside a title.
 class KSegmentedControl<T> extends StatelessWidget {
-  const KSegmentedControl({super.key, required this.segments, required this.value, required this.onChanged});
+  const KSegmentedControl({
+    super.key,
+    required this.segments,
+    required this.value,
+    required this.onChanged,
+    this.compact = false,
+  });
 
   final List<KSegment<T>> segments;
   final T value;
   final ValueChanged<T> onChanged;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -37,8 +51,8 @@ class KSegmentedControl<T> extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(color: k.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+      padding: EdgeInsets.all(compact ? 2 : 3),
+      decoration: BoxDecoration(color: k.surfaceMuted, borderRadius: BorderRadius.circular(compact ? 10 : 12)),
       child: Stack(
         children: [
           if (index >= 0)
@@ -53,7 +67,7 @@ class KSegmentedControl<T> extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: k.surfaceRaised,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(compact ? 8 : 9),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.08),
@@ -67,22 +81,32 @@ class KSegmentedControl<T> extends StatelessWidget {
               ),
             ),
           Row(
+            mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
             children: [
               for (final s in segments)
-                Expanded(
-                  child: _Segment(label: s.label, selected: s.value == value, onTap: () => pick(s.value)),
-                ),
+                if (compact) SizedBox(width: 40, child: _segment(s, pick)) else Expanded(child: _segment(s, pick)),
             ],
           ),
         ],
       ),
     );
   }
+
+  Widget _segment(KSegment<T> s, void Function(T) pick) =>
+      _Segment(label: s.label, icon: s.icon, compact: compact, selected: s.value == value, onTap: () => pick(s.value));
 }
 
 class _Segment extends StatelessWidget {
-  const _Segment({required this.label, required this.selected, required this.onTap});
+  const _Segment({
+    required this.label,
+    required this.icon,
+    required this.compact,
+    required this.selected,
+    required this.onTap,
+  });
   final String label;
+  final IconData? icon;
+  final bool compact;
   final bool selected;
   final VoidCallback onTap;
 
@@ -95,25 +119,28 @@ class _Segment extends StatelessWidget {
       inMutuallyExclusiveGroup: true,
       label: label,
       excludeSemantics: true,
+      onTap: onTap,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: ConstrainedBox(
-          // With the track's padding, a 44 pt touch target.
-          constraints: const BoxConstraints(minHeight: 38),
+          // With the track's padding, a 44 pt touch target (36 when compact).
+          constraints: BoxConstraints(minHeight: compact ? 32 : 38),
           child: Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: KText.label.copyWith(
-                  color: selected ? k.ink : k.inkSecondary,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                ),
-              ),
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: compact ? 4 : 8),
+              child: icon != null
+                  ? Icon(icon, size: 18, color: selected ? k.ink : k.inkSecondary)
+                  : Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: KText.label.copyWith(
+                        color: selected ? k.ink : k.inkSecondary,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
             ),
           ),
         ),

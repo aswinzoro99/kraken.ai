@@ -164,7 +164,8 @@ final class HomeAction extends AnalyticsEvent {
   const HomeAction(this.action, {this.monthsAgo});
 
   /// `month_selected`, `pay`, `remind`, `see_balances`, `see_activity`,
-  /// `open_insights`, `open_group`, `see_groups`.
+  /// `open_insights`, `open_group`, `see_groups`, `chart_bars`, `chart_line`,
+  /// `refresh`.
   final String action;
   final int? monthsAgo;
   @override
