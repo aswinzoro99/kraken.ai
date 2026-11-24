@@ -70,7 +70,8 @@ class _HomeView extends StatelessWidget {
             child: KEmptyState(
               icon: Icons.groups_outlined,
               title: 'No groups yet',
-              message: 'Create a group for a trip, your flat or office lunches. Your spending and balances show up here.',
+              message:
+                  'Create a group for a trip, your flat or office lunches. Your spending and balances show up here.',
               action: KButton(
                 label: 'Create a group',
                 size: KButtonSize.medium,
@@ -84,66 +85,68 @@ class _HomeView extends StatelessWidget {
       HomeReady(:final snapshot) => [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(KSpace.gutter, KSpace.sm, KSpace.gutter, 0),
-          sliver: SliverList.list(children: [
-            SpendingSection(
-              spending: snapshot.spending,
-              onSelectMonth: (month) {
-                track('month_selected', monthsAgo: (now.year - month.year) * 12 + now.month - month.month);
-                context.read<HomeCubit>().selectMonth(month);
-              },
-              onOpenInsights: () {
-                track('open_insights');
-                context.go(Paths.insights);
-              },
-            ),
-            const SizedBox(height: KSpace.xxxl),
-            BalancesSection(
-              balances: snapshot.balances,
-              onSeeAll: () {
-                track('see_balances');
-                context.go(Paths.friends);
-              },
-              onSettle: (p) {
-                track(p.amount.isNegative ? 'pay' : 'remind');
-                KToast.show(
-                  context,
-                  p.amount.isNegative ? 'Paying by UPI arrives in Phase 6.' : 'Reminders arrive in Phase 6.',
-                );
-              },
-            ),
-            if (snapshot.recent.isNotEmpty) ...[
-              const SizedBox(height: KSpace.xxxl),
-              ActivitySection(
-                items: snapshot.recent,
-                onSeeAll: () {
-                  track('see_activity');
-                  context.go(Paths.activity);
+          sliver: SliverList.list(
+            children: [
+              SpendingSection(
+                spending: snapshot.spending,
+                onSelectMonth: (month) {
+                  track('month_selected', monthsAgo: (now.year - month.year) * 12 + now.month - month.month);
+                  context.read<HomeCubit>().selectMonth(month);
+                },
+                onOpenInsights: () {
+                  track('open_insights');
+                  context.go(Paths.insights);
                 },
               ),
+              const SizedBox(height: KSpace.xxxl),
+              BalancesSection(
+                balances: snapshot.balances,
+                onSeeAll: () {
+                  track('see_balances');
+                  context.go(Paths.friends);
+                },
+                onSettle: (p) {
+                  track(p.amount.isNegative ? 'pay' : 'remind');
+                  KToast.show(
+                    context,
+                    p.amount.isNegative ? 'Paying by UPI arrives in Phase 6.' : 'Reminders arrive in Phase 6.',
+                  );
+                },
+              ),
+              if (snapshot.recent.isNotEmpty) ...[
+                const SizedBox(height: KSpace.xxxl),
+                ActivitySection(
+                  items: snapshot.recent,
+                  onSeeAll: () {
+                    track('see_activity');
+                    context.go(Paths.activity);
+                  },
+                ),
+              ],
+              const SizedBox(height: KSpace.xxxl),
+              GroupsSection(
+                groups: snapshot.groups,
+                now: now,
+                onOpen: (GroupSummary g) {
+                  track('open_group');
+                  KToast.show(context, 'The group screen arrives in Phase 2.');
+                },
+                onSeeAll: () => soon('all_groups', 'The full list of groups arrives in Phase 2.'),
+              ),
+              const SizedBox(height: KSpace.xl),
+              KBanner(
+                icon: Icons.mail_outline_rounded,
+                onTap: () => soon('gmail', 'Gmail suggestions arrive in Phase 9.'),
+                child: const Text('Connect Gmail to get split suggestions from receipts'),
+              ),
             ],
-            const SizedBox(height: KSpace.xxxl),
-            GroupsSection(
-              groups: snapshot.groups,
-              now: now,
-              onOpen: (GroupSummary g) {
-                track('open_group');
-                KToast.show(context, 'The group screen arrives in Phase 2.');
-              },
-              onSeeAll: () => soon('all_groups', 'The full list of groups arrives in Phase 2.'),
-            ),
-            const SizedBox(height: KSpace.xl),
-            KBanner(
-              icon: Icons.mail_outline_rounded,
-              onTap: () => soon('gmail', 'Gmail suggestions arrive in Phase 9.'),
-              child: const Text('Connect Gmail to get split suggestions from receipts'),
-            ),
-          ]),
+          ),
         ),
       ],
     };
 
-    return Stack(children: [
-      CustomScrollView(slivers: [
+    return CustomScrollView(
+      slivers: [
         SliverToBoxAdapter(
           child: KTopBar(
             leading: const KrakenLogo(fontSize: 20),
@@ -162,20 +165,11 @@ class _HomeView extends StatelessWidget {
           ),
         ),
         ...content,
-        // Room to scroll the last row clear of the floating action bar.
-        const SliverToBoxAdapter(child: SizedBox(height: 104)),
-      ]),
-      Positioned(
-        left: KSpace.gutter,
-        right: KSpace.gutter,
-        bottom: KSpace.md,
-        child: KActionDock(
-          onScan: () => soon('scan_bill', 'Bill scanning arrives in Phase 5.'),
-          onAddExpense: () => soon('add_expense', 'Adding expenses arrives in Phase 2.'),
-          onMicTap: () => soon('voice', 'Hold to talk arrives in Phase 4.'),
-          onMicHoldStart: () => soon('voice', 'Listening… (voice arrives in Phase 4)'),
-        ),
-      ),
-    ]);
+        // Room to scroll the last row clear of the floating glass tab bar
+        // (its height is in the bottom padding, since the shell extends the
+        // body under it).
+        SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + KSpace.xl)),
+      ],
+    );
   }
 }

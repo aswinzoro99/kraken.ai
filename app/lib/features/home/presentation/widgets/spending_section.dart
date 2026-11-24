@@ -27,53 +27,61 @@ class SpendingSection extends StatelessWidget {
     final shown = spending.categories.take(_topCategories).toList();
     final hidden = spending.categories.length - shown.length;
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(child: Text(title, style: KText.caption.copyWith(color: k.muted))),
-        KPressable(
-          onTap: onOpenInsights,
-          semanticLabel: 'Open insights',
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: KSpace.xs),
-            child: Text('Insights', style: KText.overline.copyWith(color: k.primaryText)),
-          ),
-        ),
-      ]),
-      Semantics(
-        label: '$title: ${MoneyFormat.format(spending.total)}, your share',
-        excludeSemantics: true,
-        child: Text(MoneyFormat.format(spending.total), style: KText.amountHero.copyWith(color: k.ink)),
-      ),
-      const SizedBox(height: 6),
-      if (change != null && spending.comparisonLabel != null)
-        KDelta(percent: change, against: spending.comparisonLabel!)
-      else
-        Text(
-          spending.total.isZero ? 'Nothing spent in $monthName' : 'Your share of shared expenses',
-          style: KText.caption.copyWith(color: k.muted),
-        ),
-      if (hasTrend) ...[
-        const SizedBox(height: KSpace.lg),
-        KTrendBars(
-          height: 52,
-          selected: selected,
-          onSelect: (i) => onSelectMonth(spending.months[i].month),
-          bars: [
-            for (final m in spending.months)
-              KBarDatum(
-                label: DateFormat.MMM().format(m.month),
-                value: m.total.paise.toDouble(),
-                semanticLabel: '${DateFormat.MMMM().format(m.month)}, ${MoneyFormat.format(m.total)}',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(title, style: KText.caption.copyWith(color: k.muted)),
+            ),
+            KPressable(
+              onTap: onOpenInsights,
+              semanticLabel: 'Open insights',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: KSpace.xs),
+                child: Text('Insights', style: KText.overline.copyWith(color: k.primaryText)),
               ),
+            ),
           ],
         ),
+        Semantics(
+          label: '$title: ${MoneyFormat.format(spending.total)}, your share',
+          excludeSemantics: true,
+          child: KRollingNumber(MoneyFormat.format(spending.total), style: KText.amountHero.copyWith(color: k.ink)),
+        ),
+        const SizedBox(height: 6),
+        if (change != null && spending.comparisonLabel != null)
+          KDelta(percent: change, against: spending.comparisonLabel!)
+        else
+          Text(
+            spending.total.isZero ? 'Nothing spent in $monthName' : 'Your share of shared expenses',
+            style: KText.caption.copyWith(color: k.muted),
+          ),
+        if (hasTrend) ...[
+          const SizedBox(height: KSpace.lg),
+          KTrendBars(
+            height: 52,
+            selected: selected,
+            onSelect: (i) => onSelectMonth(spending.months[i].month),
+            bars: [
+              for (final m in spending.months)
+                KBarDatum(
+                  label: DateFormat.MMM().format(m.month),
+                  value: m.total.paise.toDouble(),
+                  semanticLabel: '${DateFormat.MMMM().format(m.month)}, ${MoneyFormat.format(m.total)}',
+                ),
+            ],
+          ),
+        ],
+        if (shown.isNotEmpty) ...[
+          const SizedBox(height: KSpace.md),
+          for (final c in shown)
+            KShareRow(label: c.category.label, value: MoneyFormat.format(c.amount), share: c.share),
+          if (hidden > 0) _Rest(spending.categories.skip(_topCategories).toList()),
+        ],
       ],
-      if (shown.isNotEmpty) ...[
-        const SizedBox(height: KSpace.md),
-        for (final c in shown) KShareRow(label: c.category.label, value: MoneyFormat.format(c.amount), share: c.share),
-        if (hidden > 0) _Rest(spending.categories.skip(_topCategories).toList()),
-      ],
-    ]);
+    );
   }
 }
 

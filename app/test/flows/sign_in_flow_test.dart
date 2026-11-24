@@ -4,6 +4,9 @@ import 'package:material_ui/material_ui.dart';
 
 import '../helpers/test_app.dart';
 
+/// A rolling figure showing [value] (its digits are separate wheels).
+Finder rolling(String value) => find.byWidgetPredicate((w) => w is KRollingNumber && w.text == value);
+
 Future<void> say(WidgetTester tester, String text) async {
   await tester.enterText(find.byType(TextField), text);
   await tester.pump();
@@ -47,7 +50,7 @@ void main() {
     await tester.tap(find.text('Open your groups'));
     await tester.pumpAndSettle();
     expect(find.text('Spent so far in November'), findsOneWidget);
-    expect(find.text('₹21,500'), findsOneWidget);
+    expect(rolling('₹21,500'), findsOneWidget);
     expect(find.text('35% more than 1–24 Oct'), findsOneWidget);
     expect(find.text('Meera'), findsOneWidget);
     expect(app.haptics.played, containsAll([HapticKind.success, HapticKind.selection, HapticKind.tap]));
@@ -89,7 +92,7 @@ void main() {
 
     expect(first.services.recorder.events, isEmpty, reason: 'usage stats were refused, so nothing is sent');
 
-    await tester.tap(find.text('Account'));
+    await tester.tap(find.bySemanticsLabel('Account'));
     await tester.pumpAndSettle();
     expect(find.text('Meera'), findsOneWidget);
     await tester.ensureVisible(find.widgetWithText(KNavRow, 'Sign out'));
@@ -116,5 +119,41 @@ void main() {
     await tester.tap(find.text('Open your groups'));
     await tester.pumpAndSettle();
     expect(find.text('No groups yet'), findsOneWidget);
+  });
+
+  testWidgets('quick actions open from any tab, and scrolling shrinks the tab bar', (tester) async {
+    final app = await pumpKraken(tester);
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+    await say(tester, 'kavya@example.com');
+    await say(tester, app.inbox.value!.code);
+    await say(tester, 'Kavya');
+    await chip(tester, "Yes, I'm 18 or older");
+    await chip(tester, 'I agree');
+    await chip(tester, 'Yes, share usage stats');
+    await chip(tester, 'Skip for now');
+    await chip(tester, 'Skip for now');
+    await tester.tap(find.text('Open your groups'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.bySemanticsLabel('Quick actions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Scan a bill'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bill scanning arrives in Phase 5.'), findsOneWidget);
+    expect(app.services.recorder.names, containsAllInOrder(['quick_actions_opened', 'quick_action_used']));
+
+    // Scrolling down shrinks the bar (every tab stays); back up restores it.
+    double barHeight() => tester.getSize(find.byKey(KBottomNav.capsuleKey)).height;
+    expect(barHeight(), KBottomNav.height);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(barHeight(), KBottomNav.minimizedHeight);
+    for (final tab in ['Home', 'Friends', 'Insights', 'Activity', 'Account']) {
+      expect(find.bySemanticsLabel(tab).hitTestable(), findsOneWidget, reason: tab);
+    }
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
+    await tester.pumpAndSettle();
+    expect(barHeight(), KBottomNav.height);
   });
 }

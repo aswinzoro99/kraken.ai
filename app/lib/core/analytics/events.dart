@@ -161,3 +161,27 @@ final class HomeAction extends AnalyticsEvent {
   @override
   Map<String, Object> get params => {'action': action, 'months_ago': ?monthsAgo};
 }
+
+final class QuickActionsOpened extends AnalyticsEvent {
+  const QuickActionsOpened();
+  @override
+  String get name => 'quick_actions_opened';
+}
+
+/// A quick action was used, from the menu or by holding the + button.
+final class QuickActionUsed extends AnalyticsEvent {
+  const QuickActionUsed(this.action, {required this.via, this.completed});
+
+  /// `talk`, `scan`, `add` or `settle`.
+  final String action;
+
+  /// `menu` or `hold`.
+  final String via;
+
+  /// For holds: released to add (true) or slid away to cancel (false).
+  final bool? completed;
+  @override
+  String get name => 'quick_action_used';
+  @override
+  Map<String, Object> get params => {'action': action, 'via': via, 'completed': ?completed};
+}

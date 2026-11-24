@@ -84,7 +84,8 @@ class _AccountScreenState extends State<AccountScreen> {
     final name = profile.displayName ?? 'You';
 
     return ListView(
-      padding: EdgeInsets.zero,
+      // Room at the end for the floating glass tab bar.
+      padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
       children: [
         const KTopBar(title: 'Account'),
         Padding(

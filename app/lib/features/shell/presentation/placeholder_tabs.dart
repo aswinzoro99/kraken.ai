@@ -15,8 +15,12 @@ class _ComingTab extends StatelessWidget {
     children: [
       KTopBar(title: title),
       Expanded(
-        child: Center(
-          child: KEmptyState(icon: icon, title: heading, message: message),
+        child: Padding(
+          // Keep the message centred in the space above the floating tab bar.
+          padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+          child: Center(
+            child: KEmptyState(icon: icon, title: heading, message: message),
+          ),
         ),
       ),
     ],
