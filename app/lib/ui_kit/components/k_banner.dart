@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../foundation/k_illustrations.dart';
 import '../foundation/pressable.dart';
 import '../theme/kraken_theme.dart';
 import '../tokens/layout.dart';
@@ -46,11 +47,15 @@ class KBanner extends StatelessWidget {
 }
 
 /// Shown when a list has nothing in it yet. Says what goes here and how to
-/// add the first one.
+/// add the first one, under a simple line [illustration] (or a small [icon]).
 class KEmptyState extends StatelessWidget {
-  const KEmptyState({super.key, required this.icon, required this.title, required this.message, this.action});
+  const KEmptyState({super.key, this.icon, this.illustration, required this.title, required this.message, this.action})
+    : assert(icon != null || illustration != null);
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// One of [KIllustrations]; shown on a soft disc.
+  final String? illustration;
   final String title;
   final String message;
   final Widget? action;
@@ -63,8 +68,17 @@ class KEmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 28, color: k.muted),
-          const SizedBox(height: KSpace.md),
+          if (illustration case final art?)
+            Container(
+              width: 128,
+              height: 128,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: k.surfaceMuted, shape: BoxShape.circle),
+              child: KIllustration(art),
+            )
+          else
+            Icon(icon, size: 28, color: k.muted),
+          SizedBox(height: illustration == null ? KSpace.md : KSpace.lg),
           Text(
             title,
             textAlign: TextAlign.center,

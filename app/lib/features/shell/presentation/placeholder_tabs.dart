@@ -4,9 +4,9 @@ import '../../../ui_kit/ui_kit.dart';
 
 /// A tab whose feature arrives in a later phase. Says what will be here.
 class _ComingTab extends StatelessWidget {
-  const _ComingTab({required this.title, required this.icon, required this.heading, required this.message});
+  const _ComingTab({required this.title, required this.illustration, required this.heading, required this.message});
   final String title;
-  final IconData icon;
+  final String illustration;
   final String heading;
   final String message;
 
@@ -19,7 +19,7 @@ class _ComingTab extends StatelessWidget {
           // Keep the message centred in the space above the floating tab bar.
           padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
           child: Center(
-            child: KEmptyState(icon: icon, title: heading, message: message),
+            child: KEmptyState(illustration: illustration, title: heading, message: message),
           ),
         ),
       ),
@@ -32,7 +32,7 @@ class FriendsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const _ComingTab(
     title: 'Friends',
-    icon: Icons.people_alt_outlined,
+    illustration: KIllustrations.emptyFriends,
     heading: 'Your friends show up here',
     message: 'Everyone you share a group with, and where you stand with each of them. Arrives with groups in Phase 2.',
   );
@@ -43,7 +43,7 @@ class InsightsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const _ComingTab(
     title: 'Insights',
-    icon: Icons.insights_rounded,
+    illustration: KIllustrations.emptyInsights,
     heading: 'See where your money goes',
     message: 'Your share of spending by month, year, category and group. Arrives in Phase 7.',
   );
@@ -54,7 +54,7 @@ class ActivityTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const _ComingTab(
     title: 'Activity',
-    icon: Icons.receipt_long_outlined,
+    illustration: KIllustrations.emptyActivity,
     heading: 'Every change, in order',
     message: 'Expenses, payments and edits across your groups, with who made each. Arrives in Phase 2.',
   );

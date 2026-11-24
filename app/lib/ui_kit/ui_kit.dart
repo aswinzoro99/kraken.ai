@@ -28,6 +28,7 @@ export 'components/settings_rows.dart';
 export 'components/theme_picker.dart';
 export 'foundation/haptics_scope.dart';
 export 'foundation/k_icons.dart';
+export 'foundation/k_illustrations.dart';
 export 'foundation/liquid_glass.dart';
 export 'foundation/pressable.dart';
 export 'theme/kraken_theme.dart';

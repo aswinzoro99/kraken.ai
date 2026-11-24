@@ -1,95 +1,119 @@
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../app/kraken_app.dart';
 import '../../../app/routes.dart';
 import '../../../core/analytics/events.dart';
-import '../../../app/kraken_app.dart';
 import '../../../ui_kit/ui_kit.dart';
+import 'widgets/usage_examples.dart';
 
-/// The first screen a new person sees: what Kraken does, then "Get started"
-/// into the sign-in chat. Phone version of the desktop sign-in landing.
-class WelcomeScreen extends StatelessWidget {
+/// One page of the welcome slider: a real piece of the app, then words.
+final class _Slide {
+  const _Slide(this.example, this.title, this.body);
+
+  /// Builds the example; `active` while its slide is in view.
+  final Widget Function(bool active) example;
+  final String title;
+  final String body;
+}
+
+/// The first screen a new person sees: a slider of what Kraken does, each
+/// page showing it with a real piece of the app, and "Get started" into the
+/// sign-in chat on every page.
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  static final slides = [
+    _Slide(
+      (active) => BalancesExample(active: active),
+      'Split bills, not friendships',
+      'Kraken keeps track of who paid and who owes, in every group you share.',
+    ),
+    _Slide(
+      (active) => ChatExample(active: active),
+      'Just say it',
+      '“Cab 450 with Arjun, split equally.” Kraken writes it down and does the maths.',
+    ),
+    _Slide(
+      (active) => BillExample(active: active),
+      'Snap the bill',
+      'Take a photo of a bill and split it item by item. No typing.',
+    ),
+    _Slide(
+      (active) => SettleExample(active: active),
+      'Settle up in a tap',
+      'See where you stand with everyone, and pay back by UPI.',
+    ),
+  ];
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  final _pages = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  void _goTo(int page) => _pages.animateToPage(
+    page,
+    duration: KMotion.of(context, const Duration(milliseconds: 450)),
+    curve: KSpringCurve(KSpring.standard),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final k = context.k;
     final config = context.config;
-    final features = const [
-      (Icons.mic_none_rounded, '“Add me, Sreya for 2100, equal split”'),
-      (Icons.document_scanner_outlined, 'Snap a bill, split it by item'),
-      (Icons.insights_outlined, 'See where your money goes'),
-    ];
+    final slides = WelcomeScreen.slides;
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: IntrinsicHeight(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: KSpace.lg),
-                    const _Rise(
-                      order: 0,
-                      child: Align(alignment: Alignment.centerLeft, child: KrakenLogo(fontSize: 20)),
-                    ),
-                    const Spacer(),
-                    const SizedBox(height: KSpace.xxxl),
-                    _Rise(
-                      order: 1,
-                      child: Semantics(
-                        header: true,
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              const TextSpan(text: 'Split expenses with friends. '),
-                              TextSpan(
-                                text: 'Just say it, or snap the bill.',
-                                style: TextStyle(color: k.muted),
-                              ),
-                            ],
-                          ),
-                          style: KText.headline.copyWith(color: k.ink),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: KSpace.xxl),
-                    for (final (i, f) in features.indexed) ...[
-                      _Rise(
-                        order: 2 + i,
-                        child: _Feature(icon: f.$1, text: f.$2),
-                      ),
-                      const SizedBox(height: KSpace.md),
-                    ],
-                    const Spacer(),
-                    const SizedBox(height: KSpace.xl),
-                    _Rise(
-                      order: 6,
-                      child: KButton(
-                        label: 'Get started',
-                        expand: true,
-                        onPressed: () {
-                          context.analytics.log(const WelcomeStartTapped());
-                          // `go`, not `push`: sign-in replaces welcome, so the chat
-                          // (and its bloc) survives the session changing under it.
-                          context.go(Paths.signIn);
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: KSpace.md),
-                    _Legal(
-                      onTerms: () => _showLink(context, 'Terms', config.termsUrl),
-                      onPrivacy: () => _showLink(context, 'Privacy Policy', config.privacyPolicyUrl),
-                    ),
-                    const SizedBox(height: KSpace.lg),
-                  ],
-                ),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(KSpace.gutter, KSpace.lg, KSpace.gutter, 0),
+              child: Align(alignment: Alignment.centerLeft, child: KrakenLogo(fontSize: 20)),
+            ),
+            Expanded(
+              child: PageView.builder(
+                controller: _pages,
+                itemCount: slides.length,
+                onPageChanged: (page) {
+                  context.haptic(HapticKind.selection);
+                  setState(() => _page = page);
+                },
+                itemBuilder: (context, i) => _SlideView(slide: slides[i], active: i == _page),
               ),
             ),
-          ),
+            _Dots(count: slides.length, page: _page, onTap: _goTo),
+            const SizedBox(height: KSpace.xl),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
+              child: KButton(
+                label: 'Get started',
+                expand: true,
+                onPressed: () {
+                  context.analytics.log(const WelcomeStartTapped());
+                  // `go`, not `push`: sign-in replaces welcome, so the chat
+                  // (and its bloc) survives the session changing under it.
+                  context.go(Paths.signIn);
+                },
+              ),
+            ),
+            const SizedBox(height: KSpace.md),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
+              child: _Legal(
+                onTerms: () => _showLink(context, 'Terms', config.termsUrl),
+                onPrivacy: () => _showLink(context, 'Privacy Policy', config.privacyPolicyUrl),
+              ),
+            ),
+            const SizedBox(height: KSpace.lg),
+          ],
         ),
       ),
     );
@@ -99,24 +123,106 @@ class WelcomeScreen extends StatelessWidget {
   void _showLink(BuildContext context, String name, Uri url) => KToast.show(context, '$name: $url');
 }
 
-class _Feature extends StatelessWidget {
-  const _Feature({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
+class _SlideView extends StatelessWidget {
+  const _SlideView({required this.slide, required this.active});
+  final _Slide slide;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
     final k = context.k;
-    return MergeSemantics(
-      child: Row(
+    return LayoutBuilder(
+      builder: (context, c) => Column(
         children: [
-          Icon(icon, size: 20, color: k.muted),
-          const SizedBox(width: KSpace.md),
+          // The example takes the room the words don't need, and shrinks to
+          // fit on small phones.
           Expanded(
-            child: Text(text, style: KText.body.copyWith(color: k.inkSecondary)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.gutter, KSpace.lg, KSpace.gutter, KSpace.lg),
+              // Sits a little low, nearer the words that explain it.
+              child: Align(
+                alignment: const Alignment(0, 0.4),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  // A demo, not controls: the words below say what it shows.
+                  child: ExcludeSemantics(child: IgnorePointer(child: slide.example(active))),
+                ),
+              ),
+            ),
           ),
+          ConstrainedBox(
+            // Very large text scrolls rather than squeezing out the drawing.
+            constraints: BoxConstraints(maxHeight: c.maxHeight * 0.45),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter + KSpace.sm),
+              child: Column(
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      slide.title,
+                      textAlign: TextAlign.center,
+                      style: KText.headline.copyWith(color: k.ink),
+                    ),
+                  ),
+                  const SizedBox(height: KSpace.sm),
+                  Text(
+                    slide.body,
+                    textAlign: TextAlign.center,
+                    style: KText.body.copyWith(color: k.inkSecondary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: KSpace.lg),
         ],
       ),
+    );
+  }
+}
+
+/// Page dots: the current page is a longer pill. Each dot is a button that
+/// jumps to its page.
+class _Dots extends StatelessWidget {
+  const _Dots({required this.count, required this.page, required this.onTap});
+  final int count;
+  final int page;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    final duration = KMotion.of(context, const Duration(milliseconds: 300));
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++)
+          Semantics(
+            button: true,
+            selected: i == page,
+            label: 'Slide ${i + 1} of $count',
+            excludeSemantics: true,
+            onTap: () => onTap(i),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(i),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                child: AnimatedContainer(
+                  duration: duration,
+                  curve: KSpringCurve(KSpring.snappy),
+                  width: i == page ? 24 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: i == page ? k.primary : k.line,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -149,32 +255,6 @@ class _Legal extends StatelessWidget {
         ),
         Text('.', style: style),
       ],
-    );
-  }
-}
-
-/// Staggered fade-and-rise on first show. Skipped under reduced motion.
-class _Rise extends StatelessWidget {
-  const _Rise({required this.order, required this.child});
-  final int order;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = KMotion.of(context, Duration(milliseconds: 360 + order * 70));
-    if (total == Duration.zero) return child;
-    final start = order * 70 / total.inMilliseconds;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: total,
-      builder: (context, t, child) {
-        final p = KMotion.curve.transform(((t - start) / (1 - start)).clamp(0, 1));
-        return Opacity(
-          opacity: p,
-          child: Transform.translate(offset: Offset(0, 12 * (1 - p)), child: child),
-        );
-      },
-      child: child,
     );
   }
 }

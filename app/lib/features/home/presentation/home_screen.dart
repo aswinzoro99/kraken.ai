@@ -60,7 +60,7 @@ class _HomeView extends StatelessWidget {
           hasScrollBody: false,
           child: Center(
             child: KEmptyState(
-              icon: Icons.cloud_off_rounded,
+              illustration: KIllustrations.emptyOffline,
               title: "Couldn't load your groups",
               message: 'Check your connection. Kraken will try again when you are back online.',
             ),
@@ -72,7 +72,7 @@ class _HomeView extends StatelessWidget {
           hasScrollBody: false,
           child: Center(
             child: KEmptyState(
-              icon: Icons.groups_outlined,
+              illustration: KIllustrations.emptyGroups,
               title: 'No groups yet',
               message:
                   'Create a group for a trip, your flat or office lunches. Your spending and balances show up here.',

@@ -17,7 +17,7 @@ import 'services.dart';
 Future<AppServices> compose(AppConfig config) async {
   final store = await SharedPrefsStore.create();
   return switch (config.flavor) {
-    Flavor.mock => mockServices(config: config, store: store),
+    Flavor.mock => mockServices(config: config, store: await startSignedOut(store)),
     Flavor.dev || Flavor.prod => throw UnsupportedError(
       'The ${config.flavor.name} flavor needs the Firebase projects (build guide, Phase 0 day 3). '
       'Run the mock flavor for now: flutter run -t lib/main_mock.dart',
@@ -52,4 +52,14 @@ AppServices mockServices({
     groups: MockGroupsRepository(clock: clock, empty: emptyGroups),
     devTools: DevTools(inbox: mockInbox, mockAuth: auth, recorder: recorder),
   );
+}
+
+/// The mock build forgets who was signed in each time it launches, so every
+/// launch starts at Welcome and the sign-in flow can be tested. Profiles and
+/// settings stay: an email used before signs straight back in, a new one
+/// goes through the whole sign-up chat.
+Future<KeyValueStore> startSignedOut(KeyValueStore store) async {
+  await store.remove(StoreKeys.mockSession);
+  await store.remove(StoreKeys.pendingEmail);
+  return store;
 }

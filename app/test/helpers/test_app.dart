@@ -30,6 +30,7 @@ AppServices testServices({
 }) => mockServices(
   config: AppConfig.forFlavor(Flavor.mock).copyWith(chatPacing: Duration.zero),
   store: store ?? MemoryStore(),
+  clock: clock,
   latency: Duration.zero,
   hapticsEngine: haptics ?? RecordingHapticsEngine(),
   inbox: inbox,

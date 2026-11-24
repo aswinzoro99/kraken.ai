@@ -34,6 +34,8 @@ flutter:
   # Tab bar icons from the design (24 x 24, one colour, tinted in code).
   assets:
     - assets/icons/
+    # Line drawings for empty and error screens, one colour, tinted in code.
+    - assets/illustrations/
   fonts:
     - family: Poppins
       fonts:
