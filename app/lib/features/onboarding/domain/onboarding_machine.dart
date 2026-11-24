@@ -491,7 +491,8 @@ final class OnboardingMachine {
       WrongCode(:final attemptsLeft) => Step(back, say: [BotLine(Line.wrongCode, count: attemptsLeft)]),
       CodeExpired() || NoCodeRequested() => Step(back, say: const [BotLine(Line.codeExpired)]),
       TooManyAttempts() => Step(back, say: const [BotLine(Line.tooManyAttempts)]),
-      AuthNetworkFailure() || ResendTooSoon() => Step(back, say: const [BotLine(Line.network)]),
+      // The chat only signs in by email, so a cancelled Apple/Google sheet never reaches here.
+      AuthNetworkFailure() || ResendTooSoon() || SignInCancelled() => Step(back, say: const [BotLine(Line.network)]),
     };
   }
 

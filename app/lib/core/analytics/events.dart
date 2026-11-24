@@ -28,6 +28,18 @@ final class WelcomeStartTapped extends AnalyticsEvent {
   String get name => 'welcome_start_tapped';
 }
 
+final class SignInMethodChosen extends AnalyticsEvent {
+  const SignInMethodChosen(this.method, {required this.signUp});
+
+  /// `email`, `apple`, `google` or `agent`.
+  final String method;
+  final bool signUp;
+  @override
+  String get name => 'sign_in_method_chosen';
+  @override
+  Map<String, Object> get params => {'method': method, 'sign_up': signUp};
+}
+
 final class SignInEmailSubmitted extends AnalyticsEvent {
   const SignInEmailSubmitted({required this.valid});
   final bool valid;

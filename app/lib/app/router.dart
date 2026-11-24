@@ -7,6 +7,8 @@ import '../core/analytics/analytics_route_observer.dart';
 import '../core/analytics/analytics.dart';
 import '../debug/debug_screen.dart';
 import '../features/account/presentation/account_screen.dart';
+import '../features/auth/presentation/finish_sign_up_screen.dart';
+import '../features/auth/presentation/login_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/presentation/sign_in_chat_screen.dart';
 import '../features/shell/presentation/home_shell.dart';
@@ -23,11 +25,17 @@ String? redirectFor(SessionState session, String location, {required bool debugA
   if (atDebug) return debugAllowed ? null : Paths.splash;
   return switch (session) {
     SessionLoading() => location == Paths.splash ? null : Paths.splash,
-    SignedOutSession() => (inApp || location == Paths.splash) ? Paths.welcome : null,
-    // Mid-sign-up: the chat picks up where they stopped.
-    OnboardingSession() => location == Paths.signIn ? null : Paths.signIn,
+    SignedOutSession() =>
+      (inApp || location == Paths.splash)
+          ? Paths.welcome
+          : location == Paths.finishSignUp
+          ? Paths.login
+          : null,
+    // Mid-sign-up: the chat carries on where it is; otherwise the form.
+    OnboardingSession() => (location == Paths.signIn || location == Paths.finishSignUp) ? null : Paths.finishSignUp,
     // Finished: the chat may stay open to show "Open your groups".
-    ReadySession() => (location == Paths.splash || location == Paths.welcome) ? Paths.home : null,
+    ReadySession() =>
+      const [Paths.splash, Paths.welcome, Paths.login, Paths.finishSignUp].contains(location) ? Paths.home : null,
   };
 }
 
@@ -60,6 +68,8 @@ GoRouter createRouter({
     routes: [
       GoRoute(path: Paths.splash, name: Routes.splash, builder: (_, _) => const SplashScreen()),
       GoRoute(path: Paths.welcome, name: Routes.welcome, builder: (_, _) => const WelcomeScreen()),
+      GoRoute(path: Paths.login, name: Routes.login, builder: (_, _) => const LoginScreen()),
+      GoRoute(path: Paths.finishSignUp, name: Routes.finishSignUp, builder: (_, _) => const FinishSignUpScreen()),
       GoRoute(path: Paths.signIn, name: Routes.signIn, builder: (_, _) => const SignInChatScreen()),
       GoRoute(path: Paths.debug, name: Routes.debug, builder: (_, _) => const DebugScreen()),
       StatefulShellRoute.indexedStack(

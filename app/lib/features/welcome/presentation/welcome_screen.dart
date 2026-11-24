@@ -1,9 +1,12 @@
+import 'package:flutter/rendering.dart' show OverflowBoxFit;
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../app/kraken_app.dart';
 import '../../../app/routes.dart';
 import '../../../core/analytics/events.dart';
+import '../../../core/storage/key_value_store.dart';
 import '../../../ui_kit/ui_kit.dart';
 import 'widgets/usage_examples.dart';
 
@@ -18,8 +21,10 @@ final class _Slide {
 }
 
 /// The first screen a new person sees: a slider of what Kraken does, each
-/// page showing it with a real piece of the app, and "Get started" into the
-/// sign-in chat on every page.
+/// page showing it with a real piece of the app. Back and Next move one
+/// slide, exactly like a swipe, and the last slide's Next is Get started (into
+/// log in / sign up), so everyone sees every slide. Someone who has seen them
+/// all before gets a Skip link.
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -54,17 +59,43 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   final _pages = PageController();
   int _page = 0;
 
+  /// Seen every slide before (on this device): offer Skip.
+  late final bool _seenBefore = context.read<KeyValueStore>().getBool(StoreKeys.welcomeSeen) ?? false;
+
+  /// True while Back or Next is moving the slider; the button already
+  /// played its haptic, so the page change doesn't add a second one.
+  bool _driving = false;
+
+  int get _last => WelcomeScreen.slides.length - 1;
+
+  void _onPage(int page) {
+    if (!_driving) context.haptic(HapticKind.selection);
+    setState(() => _page = page);
+    if (page == _last) context.read<KeyValueStore>().setBool(StoreKeys.welcomeSeen, true);
+  }
+
+  void _start() {
+    context.analytics.log(const WelcomeStartTapped());
+    // `go`, not `push`: sign-in replaces welcome, so its bloc survives the
+    // session changing under it.
+    context.go(Paths.login);
+  }
+
   @override
   void dispose() {
     _pages.dispose();
     super.dispose();
   }
 
-  void _goTo(int page) => _pages.animateToPage(
-    page,
-    duration: KMotion.of(context, const Duration(milliseconds: 450)),
-    curve: KSpringCurve(KSpring.standard),
-  );
+  Future<void> _goTo(int page) async {
+    _driving = true;
+    await _pages.animateToPage(
+      page,
+      duration: KMotion.of(context, const Duration(milliseconds: 450)),
+      curve: KSpringCurve(KSpring.standard),
+    );
+    _driving = false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,42 +105,54 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(KSpace.gutter, KSpace.lg, KSpace.gutter, 0),
-              child: Align(alignment: Alignment.centerLeft, child: KrakenLogo(fontSize: 20)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(KSpace.gutter, KSpace.lg, KSpace.sm, 0),
+              child: SizedBox(
+                height: 36,
+                child: Row(
+                  children: [
+                    const KrakenLogo(fontSize: 20),
+                    const Spacer(),
+                    if (_seenBefore && _page != _last)
+                      KButton(label: 'Skip', variant: KButtonVariant.ghost, size: KButtonSize.small, onPressed: _start),
+                  ],
+                ),
+              ),
             ),
             Expanded(
               child: PageView.builder(
                 controller: _pages,
                 itemCount: slides.length,
-                onPageChanged: (page) {
-                  context.haptic(HapticKind.selection);
-                  setState(() => _page = page);
-                },
+                onPageChanged: _onPage,
                 itemBuilder: (context, i) => _SlideView(slide: slides[i], active: i == _page),
               ),
             ),
-            _Dots(count: slides.length, page: _page, onTap: _goTo),
+            _Dots(count: slides.length, page: _page),
             const SizedBox(height: KSpace.xl),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
-              child: KButton(
-                label: 'Get started',
-                expand: true,
-                onPressed: () {
-                  context.analytics.log(const WelcomeStartTapped());
-                  // `go`, not `push`: sign-in replaces welcome, so the chat
-                  // (and its bloc) survives the session changing under it.
-                  context.go(Paths.signIn);
-                },
+              child: _Controls(
+                page: _page,
+                last: _last,
+                onBack: () => _goTo(_page - 1),
+                onNext: () => _goTo(_page + 1),
+                onStart: _start,
               ),
             ),
             const SizedBox(height: KSpace.md),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: KSpace.gutter),
-              child: _Legal(
-                onTerms: () => _showLink(context, 'Terms', config.termsUrl),
-                onPrivacy: () => _showLink(context, 'Privacy Policy', config.privacyPolicyUrl),
+              // The terms go with the button that starts sign-up.
+              child: AnimatedOpacity(
+                opacity: _page == _last ? 1 : 0,
+                duration: KMotion.of(context, KMotion.base),
+                child: ExcludeSemantics(
+                  excluding: _page != _last,
+                  child: _Legal(
+                    onTerms: () => _showLink(context, 'Terms', config.termsUrl),
+                    onPrivacy: () => _showLink(context, 'Privacy Policy', config.privacyPolicyUrl),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: KSpace.lg),
@@ -182,47 +225,109 @@ class _SlideView extends StatelessWidget {
   }
 }
 
-/// Page dots: the current page is a longer pill. Each dot is a button that
-/// jumps to its page.
+/// Back and Next, which move one slide like a swipe. Back appears from the
+/// second slide; on the last, Next becomes Get started.
+class _Controls extends StatelessWidget {
+  const _Controls({
+    required this.page,
+    required this.last,
+    required this.onBack,
+    required this.onNext,
+    required this.onStart,
+  });
+  final int page;
+  final int last;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+  final VoidCallback onStart;
+
+  static const _backWidth = 112.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = KMotion.of(context, KMotion.base);
+    final curve = KSpringCurve(KSpring.snappy);
+    final showBack = page > 0;
+    return Row(
+      children: [
+        AnimatedContainer(
+          duration: duration,
+          curve: curve,
+          width: showBack ? _backWidth + KSpace.sm : 0,
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(),
+          child: OverflowBox(
+            // Sized by the button, so the row stays the button's height.
+            fit: OverflowBoxFit.deferToChild,
+            alignment: Alignment.centerLeft,
+            minWidth: _backWidth,
+            maxWidth: _backWidth,
+            child: ExcludeSemantics(
+              excluding: !showBack,
+              child: KButton(
+                label: 'Back',
+                variant: KButtonVariant.secondary,
+                expand: true,
+                haptic: HapticKind.selection,
+                onPressed: showBack ? onBack : null,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: duration,
+            child: page == last
+                ? KButton(key: const ValueKey('start'), label: 'Get started', expand: true, onPressed: onStart)
+                : KButton(
+                    key: const ValueKey('next'),
+                    label: 'Next',
+                    variant: KButtonVariant.secondary,
+                    expand: true,
+                    haptic: HapticKind.selection,
+                    onPressed: onNext,
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Page dots: where you are, the current page a longer pill. Indicators
+/// only; Back, Next and swiping move between slides.
 class _Dots extends StatelessWidget {
-  const _Dots({required this.count, required this.page, required this.onTap});
+  const _Dots({required this.count, required this.page});
   final int count;
   final int page;
-  final ValueChanged<int> onTap;
 
   @override
   Widget build(BuildContext context) {
     final k = context.k;
     final duration = KMotion.of(context, const Duration(milliseconds: 300));
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < count; i++)
-          Semantics(
-            button: true,
-            selected: i == page,
-            label: 'Slide ${i + 1} of $count',
-            excludeSemantics: true,
-            onTap: () => onTap(i),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onTap(i),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                child: AnimatedContainer(
-                  duration: duration,
-                  curve: KSpringCurve(KSpring.snappy),
-                  width: i == page ? 24 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: i == page ? k.primary : k.line,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+    return Semantics(
+      label: 'Slide ${page + 1} of $count',
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < count; i++)
+              AnimatedContainer(
+                duration: duration,
+                curve: KSpringCurve(KSpring.snappy),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: i == page ? 24 : 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: i == page ? k.primary : k.line,
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }

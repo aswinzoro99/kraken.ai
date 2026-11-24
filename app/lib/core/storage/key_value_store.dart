@@ -16,6 +16,7 @@ abstract final class StoreKeys {
   static const hapticsEnabled = 'settings.haptics_enabled';
   static const appearance = 'settings.appearance';
   static const homeChart = 'home.chart_style';
+  static const welcomeSeen = 'welcome.seen_all_slides';
   static const analyticsConsent = 'privacy.analytics_consent';
   static const pendingEmail = 'auth.pending_email';
   static const mockSession = 'mock.session';

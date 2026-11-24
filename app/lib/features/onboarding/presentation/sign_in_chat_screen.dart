@@ -72,8 +72,8 @@ class _SignInChatViewState extends State<_SignInChatView> {
           children: [
             KTopBar(
               bordered: true,
-              // Back to welcome only before anyone is signed in.
-              onBack: context.watch<SessionCubit>().state is SignedOutSession ? () => context.go(Paths.welcome) : null,
+              // Back to the regular sign-in only before anyone is signed in.
+              onBack: context.watch<SessionCubit>().state is SignedOutSession ? () => context.go(Paths.login) : null,
               leading: const KrakenLogo(fontSize: 18),
             ),
             Expanded(child: _Transcript(view: view)),

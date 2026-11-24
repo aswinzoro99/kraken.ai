@@ -48,3 +48,13 @@ Future<TestApp> pumpKraken(WidgetTester tester, {MemoryStore? store, bool emptyG
   await tester.pumpAndSettle();
   return TestApp(services, haptics, inbox, memory);
 }
+
+/// Welcome: Next through every slide, then Get started (into log in).
+Future<void> getStarted(WidgetTester tester) async {
+  for (var i = 0; i < 4 && find.text('Get started').evaluate().isEmpty; i++) {
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.text('Get started'));
+  await tester.pumpAndSettle();
+}

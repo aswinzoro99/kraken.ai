@@ -5,9 +5,12 @@ import 'otp_code.dart';
 /// The signed-in person, as far as sign-in knows. Profile details (name,
 /// consents) live in the profile feature.
 final class AppUser {
-  const AppUser({required this.uid, required this.email});
+  const AppUser({required this.uid, required this.email, this.name});
   final String uid;
   final EmailAddress email;
+
+  /// The name Apple or Google shared, if any; used to prefill sign-up.
+  final String? name;
 
   @override
   bool operator ==(Object other) => other is AppUser && other.uid == uid;
@@ -55,13 +58,24 @@ final class NoCodeRequested extends AuthFailure {
   String get code => 'no_code_requested';
 }
 
+/// The person closed the Apple or Google sheet. Not an error to show.
+final class SignInCancelled extends AuthFailure {
+  const SignInCancelled();
+  @override
+  String get code => 'cancelled';
+}
+
 final class AuthNetworkFailure extends AuthFailure {
   const AuthNetworkFailure();
   @override
   String get code => 'network';
 }
 
-/// Email sign-in with a 6-digit code, as in the design.
+/// Accounts people can sign in with instead of an email code.
+enum SocialProvider { apple, google }
+
+/// Email sign-in with a 6-digit code, as in the design, or with Apple or
+/// Google.
 ///
 /// The real implementation (Phase 1) asks the Dart API to email a code, then
 /// exchanges the verified code for a Firebase custom token. No passwords and
@@ -77,6 +91,10 @@ abstract interface class AuthRepository {
 
   /// Signs in when [code] matches the latest code sent to [email].
   Future<Result<AppUser, AuthFailure>> verifyCode(EmailAddress email, OtpCode code);
+
+  /// Signs in with Apple or Google: the system sheet, then a Firebase
+  /// credential (Phase 1). [SignInCancelled] if the person backs out.
+  Future<Result<AppUser, AuthFailure>> signInWith(SocialProvider provider);
 
   Future<void> signOut();
 

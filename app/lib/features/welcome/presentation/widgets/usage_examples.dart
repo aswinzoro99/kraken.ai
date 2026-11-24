@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:ledger/ledger.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -178,75 +180,229 @@ class _Person extends StatelessWidget {
   }
 }
 
-/// Talking to Kraken: you say what happened, it adds the expense.
-class ChatExample extends StatelessWidget {
+/// Talking to Kraken, played out each time the slide comes into view: the
+/// mic listens (pulsing, with a live level meter) while your words appear,
+/// then they drop into the chat, Kraken answers, and the expense shows up.
+/// Under Reduce Motion it shows the end straight away.
+class ChatExample extends StatefulWidget {
   const ChatExample({super.key, required this.active});
   final bool active;
+
+  static const said = 'Cab 450 with Arjun, split equally';
+
+  @override
+  State<ChatExample> createState() => _ChatExampleState();
+}
+
+class _ChatExampleState extends State<ChatExample> with SingleTickerProviderStateMixin {
+  late final AnimationController _play = AnimationController(vsync: this, duration: const Duration(milliseconds: 4600));
+
+  bool get _still => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_still) {
+      _play.value = 1;
+    } else if (widget.active && !_play.isAnimating && _play.value == 0) {
+      _play.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(ChatExample old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active && !_still) _play.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _play.dispose();
+    super.dispose();
+  }
+
+  /// Like live captions: the newest words stay in view, the start trims.
+  static String _caption(String text, {int room = 24}) =>
+      text.length <= room ? text : '…${text.substring(text.length - room + 1)}';
+
+  /// 0 → 1 across [from, to] of the timeline, eased.
+  double _phase(double from, double to) =>
+      KMotion.curve.transform(((_play.value - from) / (to - from)).clamp(0.0, 1.0));
+
+  Widget _reveal(double from, Widget child) {
+    final p = _phase(from, from + 0.1);
+    return Opacity(
+      opacity: p,
+      child: Transform.translate(offset: Offset(0, 12 * (1 - p)), child: child),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final k = context.k;
     return ExampleFrame(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Step(
-            order: 0,
-            active: active,
-            child: const ChatBubble(author: ChatAuthor.me, text: 'Cab 450 with Arjun, split equally'),
-          ),
-          const SizedBox(height: KSpace.sm),
-          _Step(
-            order: 1,
-            active: active,
-            child: const ChatBubble(author: ChatAuthor.kraken, text: 'Added to Goa Trip. Arjun owes you ₹225.'),
-          ),
-          const SizedBox(height: KSpace.md),
-          _Step(
-            order: 2,
-            active: active,
-            child: Container(
-              padding: const EdgeInsets.all(KSpace.md),
-              decoration: BoxDecoration(color: k.surfaceMuted, borderRadius: BorderRadius.circular(14)),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(color: k.surface, shape: BoxShape.circle),
-                    child: Icon(Icons.local_taxi_rounded, size: 19, color: k.ink),
-                  ),
-                  const SizedBox(width: KSpace.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+      child: AnimatedBuilder(
+        animation: _play,
+        builder: (context, _) {
+          const listenEnd = 0.46;
+          final listening = _play.value > 0 && _play.value < listenEnd;
+          final typed = (ChatExample.said.length * _phase(0.06, 0.4)).round();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _TalkBar(
+                listening: listening,
+                beat: _play.value * 22,
+                text: _play.value < listenEnd
+                    ? (typed == 0 ? 'Listening…' : _caption(ChatExample.said.substring(0, typed)))
+                    : 'Touch and hold to talk',
+                hint: _play.value >= listenEnd,
+              ),
+              const SizedBox(height: KSpace.md),
+              _reveal(0.48, const ChatBubble(author: ChatAuthor.me, text: ChatExample.said)),
+              const SizedBox(height: KSpace.sm),
+              _reveal(
+                0.62,
+                const ChatBubble(author: ChatAuthor.kraken, text: 'Added to Goa Trip. Arjun owes you ₹225.'),
+              ),
+              const SizedBox(height: KSpace.md),
+              _reveal(
+                0.78,
+                Container(
+                  padding: const EdgeInsets.all(KSpace.md),
+                  decoration: BoxDecoration(color: k.surfaceMuted, borderRadius: BorderRadius.circular(14)),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(color: k.surface, shape: BoxShape.circle),
+                        child: Icon(Icons.local_taxi_rounded, size: 19, color: k.ink),
+                      ),
+                      const SizedBox(width: KSpace.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Cab', style: KText.bodyStrong.copyWith(color: k.ink)),
-                            const SizedBox(width: 6),
-                            Icon(Icons.mic_rounded, size: 14, color: k.muted),
+                            Row(
+                              children: [
+                                Text('Cab', style: KText.bodyStrong.copyWith(color: k.ink)),
+                                const SizedBox(width: 6),
+                                Icon(Icons.mic_rounded, size: 14, color: k.muted),
+                              ],
+                            ),
+                            Text('You paid ${_money(450)} · 2 people', style: KText.small.copyWith(color: k.muted)),
                           ],
                         ),
-                        Text('You paid ${_money(450)} · 2 people', style: KText.small.copyWith(color: k.muted)),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('you lent', style: KText.small.copyWith(color: k.owed)),
-                      Text(_money(225), style: KText.amount.copyWith(color: k.owed)),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('you lent', style: KText.small.copyWith(color: k.owed)),
+                          Text(_money(225), style: KText.amount.copyWith(color: k.owed)),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// The mic, as when you hold + in the app: rings pulse out of it and a
+/// level meter moves while it listens; afterwards it rests with the hint.
+class _TalkBar extends StatelessWidget {
+  const _TalkBar({required this.listening, required this.beat, required this.text, required this.hint});
+  final bool listening;
+
+  /// Advances while listening; drives the rings and the meter.
+  final double beat;
+  final String text;
+  final bool hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 14, 8),
+      decoration: BoxDecoration(color: k.surfaceMuted, borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 40,
+            child: CustomPaint(
+              painter: _Rings(color: k.primary, beat: listening ? beat : null),
+              child: Center(
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(color: k.primary, shape: BoxShape.circle),
+                  child: Icon(Icons.mic_rounded, size: 20, color: k.onPrimary),
+                ),
               ),
             ),
           ),
+          const SizedBox(width: KSpace.sm),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: (hint ? KText.caption : KText.label).copyWith(
+                color: hint ? k.muted : k.ink,
+                fontWeight: hint ? FontWeight.w500 : FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: KSpace.xs),
+          for (var i = 0; i < 4; i++) ...[
+            if (i > 0) const SizedBox(width: 3),
+            Container(
+              width: 3,
+              height: listening ? 5 + 13 * (0.5 + 0.5 * math.sin(beat * 2.4 + i * 1.3)) : 5,
+              decoration: BoxDecoration(
+                color: listening ? k.primary : k.placeholder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+}
+
+/// Two rings spreading out from the mic while it listens.
+class _Rings extends CustomPainter {
+  _Rings({required this.color, required this.beat});
+  final Color color;
+  final double? beat;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final beat = this.beat;
+    if (beat == null) return;
+    final centre = size.center(Offset.zero);
+    for (final offset in [0.0, 0.5]) {
+      final f = (beat * 0.25 + offset) % 1.0;
+      canvas.drawCircle(
+        centre,
+        18 + 10 * f,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..color = color.withValues(alpha: 0.45 * (1 - f)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_Rings old) => old.beat != beat || old.color != color;
 }
 
 /// A scanned bill, split item by item between the people who had each.

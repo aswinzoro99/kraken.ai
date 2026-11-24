@@ -90,6 +90,24 @@ final class MockAuthRepository implements AuthRepository {
     return Ok(user);
   }
 
+  /// The account each provider "returns" here. Always the same one, so the
+  /// second time is a returning sign-in.
+  static final mockAccounts = {
+    SocialProvider.apple: (email: 'kraken.tester@privaterelay.appleid.com', name: 'Kraken Tester'),
+    SocialProvider.google: (email: 'kraken.tester@gmail.com', name: 'Kraken Tester'),
+  };
+
+  @override
+  Future<Result<AppUser, AuthFailure>> signInWith(SocialProvider provider) async {
+    await _wait();
+    if (_consumeFailure()) return const Err(AuthNetworkFailure());
+    final account = mockAccounts[provider]!;
+    final email = EmailAddress.tryParse(account.email)!;
+    final user = AppUser(uid: _uidFor(email), email: email, name: account.name);
+    await _setUser(user);
+    return Ok(user);
+  }
+
   @override
   Future<void> signOut() => _setUser(null);
 

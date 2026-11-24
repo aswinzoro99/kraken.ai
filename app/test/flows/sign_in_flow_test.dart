@@ -7,6 +7,13 @@ import '../helpers/test_app.dart';
 /// A rolling figure showing [value] (its digits are separate wheels).
 Finder rolling(String value) => find.byWidgetPredicate((w) => w is KRollingNumber && w.text == value);
 
+/// Welcome → Get started → the Kraken logo: the agent sign-up.
+Future<void> openChat(WidgetTester tester) async {
+  await getStarted(tester);
+  await tester.tap(find.bySemanticsLabel('Chat with Kraken'));
+  await tester.pumpAndSettle();
+}
+
 Future<void> say(WidgetTester tester, String text) async {
   await tester.enterText(find.byType(TextField), text);
   await tester.pump();
@@ -23,9 +30,10 @@ void main() {
   testWidgets('a new person signs up by chat and lands on Home', (tester) async {
     final app = await pumpKraken(tester);
 
-    expect(find.text('Get started'), findsOneWidget);
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
+    // A first visit has to see the slides before it can start.
+    expect(find.text('Next'), findsOneWidget);
+    expect(find.text('Get started'), findsNothing);
+    await openChat(tester);
     expect(find.textContaining("What's your email address?"), findsOneWidget);
 
     await say(tester, 'not an email');
@@ -72,8 +80,7 @@ void main() {
 
   testWidgets('a returning person goes straight to Home, and can sign out', (tester) async {
     final first = await pumpKraken(tester);
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
+    await openChat(tester);
     await say(tester, 'meera@example.com');
     await say(tester, first.inbox.value!.code);
     await say(tester, 'Meera');
@@ -101,13 +108,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(KButton, 'Sign out'));
     await tester.pumpAndSettle();
-    expect(find.text('Get started'), findsOneWidget);
+    // Back on welcome; the slides were seen, so Skip is offered.
+    expect(find.text('Skip'), findsOneWidget);
   });
 
   testWidgets('an empty account shows the empty state', (tester) async {
     final app = await pumpKraken(tester, emptyGroups: true);
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
+    await openChat(tester);
     await say(tester, 'new@example.com');
     await say(tester, app.inbox.value!.code);
     await say(tester, 'Sreya');
@@ -123,8 +130,7 @@ void main() {
 
   testWidgets('quick actions open from any tab, and scrolling shrinks the tab bar', (tester) async {
     final app = await pumpKraken(tester);
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
+    await openChat(tester);
     await say(tester, 'kavya@example.com');
     await say(tester, app.inbox.value!.code);
     await say(tester, 'Kavya');
@@ -159,8 +165,7 @@ void main() {
 
   testWidgets('Appearance in Account switches the theme and is kept after a restart', (tester) async {
     final first = await pumpKraken(tester);
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
+    await openChat(tester);
     await say(tester, 'aarav@example.com');
     await say(tester, first.inbox.value!.code);
     await say(tester, 'Aarav');
@@ -192,8 +197,7 @@ void main() {
 
   testWidgets('Home: a welcome, a chart toggle that is remembered, and pull to refresh', (tester) async {
     final first = await pumpKraken(tester);
-    await tester.tap(find.text('Get started'));
-    await tester.pumpAndSettle();
+    await openChat(tester);
     await say(tester, 'aarav@example.com');
     await say(tester, first.inbox.value!.code);
     await say(tester, 'Aarav');

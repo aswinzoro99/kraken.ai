@@ -21,17 +21,24 @@ void main() {
     expect(go(const SignedOutSession(), Paths.home), Paths.welcome);
     expect(go(const SignedOutSession(), Paths.account), Paths.welcome);
     expect(go(const SignedOutSession(), Paths.signIn), isNull);
+    expect(go(const SignedOutSession(), Paths.login), isNull);
     expect(go(const SignedOutSession(), Paths.welcome), isNull);
+    // The last sign-up step needs someone signed in.
+    expect(go(const SignedOutSession(), Paths.finishSignUp), Paths.login);
   });
 
-  test('unfinished sign-ups go back to the chat', () {
-    expect(go(OnboardingSession(user, null), Paths.home), Paths.signIn);
+  test('unfinished sign-ups finish on the form, or carry on in the chat', () {
+    expect(go(OnboardingSession(user, null), Paths.home), Paths.finishSignUp);
+    expect(go(OnboardingSession(user, null), Paths.login), Paths.finishSignUp);
+    expect(go(OnboardingSession(user, null), Paths.finishSignUp), isNull);
     expect(go(OnboardingSession(user, null), Paths.signIn), isNull);
   });
 
   test('finished people land in the app, and may stay on the last chat step', () {
     expect(go(ready, Paths.splash), Paths.home);
     expect(go(ready, Paths.welcome), Paths.home);
+    expect(go(ready, Paths.login), Paths.home);
+    expect(go(ready, Paths.finishSignUp), Paths.home);
     expect(go(ready, Paths.signIn), isNull);
     expect(go(ready, Paths.account), isNull);
   });
