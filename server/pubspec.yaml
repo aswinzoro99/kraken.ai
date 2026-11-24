@@ -1,0 +1,21 @@
+name: kraken_server
+description: Kraken's API, for the jobs a phone can't be trusted with.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.5
+
+# Versions are pinned exactly, like the app's. Deliberately not part of the
+# app's pub workspace, so the Docker build needs only the Dart SDK.
+dependencies:
+  crypto: 3.0.8
+  dart_jsonwebtoken: 3.4.1
+  googleapis_auth: 2.3.7
+  http: 1.6.0
+  shelf: 1.4.3
+  shelf_router: 1.1.5
+
+dev_dependencies:
+  lints: 6.0.0
+  test: 1.33.0
