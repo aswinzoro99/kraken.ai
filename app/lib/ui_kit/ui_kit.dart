@@ -22,6 +22,7 @@ export 'components/kraken_logo.dart';
 export 'components/money_text.dart';
 export 'components/settings_rows.dart';
 export 'foundation/haptics_scope.dart';
+export 'foundation/k_icons.dart';
 export 'foundation/liquid_glass.dart';
 export 'foundation/pressable.dart';
 export 'theme/kraken_theme.dart';

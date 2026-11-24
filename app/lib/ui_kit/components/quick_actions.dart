@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/haptics/haptics.dart';
 import '../foundation/haptics_scope.dart';
+import '../foundation/k_icons.dart';
 import '../foundation/liquid_glass.dart';
 import '../foundation/pressable.dart';
 import '../theme/kraken_theme.dart';
@@ -25,7 +26,11 @@ final class KQuickAction {
 
 enum _Talk { idle, listening, cancel }
 
-/// The round glass + that sits beside the tab bar on every tab.
+/// The plus is drawn at 24 pt on the 58 pt button, and scales with it.
+const _plusScale = 24 / 58;
+
+/// The round + that sits beside the tab bar on every tab: blue tinted
+/// glass with a white plus, in light and dark mode.
 ///
 /// * Tap: a glass menu grows out of the button and the + turns into ×.
 /// * Press and hold: talk. A capsule shows Kraken listening; release to
@@ -152,6 +157,7 @@ class _KQuickActionButtonState extends State<KQuickActionButton> {
           valueListenable: _talk,
           builder: (context, talk, _) {
             final talking = talk != _Talk.idle;
+            final cancel = talk == _Talk.cancel;
             return LayoutBuilder(
               builder: (context, c) {
                 // Fills the square it's given (it shrinks with the tab bar).
@@ -162,26 +168,27 @@ class _KQuickActionButtonState extends State<KQuickActionButton> {
                   curve: _curve,
                   child: SizedBox.square(
                     dimension: size,
-                    child: KLiquidGlass(
+                    // Blue while idle or listening; soft red while sliding
+                    // away to cancel.
+                    child: TweenAnimationBuilder<Color?>(
+                      tween: ColorTween(end: cancel ? k.dangerSoft : k.tabAdd),
+                      duration: duration,
+                      builder: (context, tint, child) => KLiquidGlass(tint: tint, child: child!),
                       child: Center(
                         child: AnimatedSwitcher(
                           duration: duration,
                           child: talking
-                              ? Container(
-                                  key: const ValueKey('mic'),
-                                  width: size - 12,
-                                  height: size - 12,
-                                  decoration: BoxDecoration(
-                                    color: talk == _Talk.cancel ? k.danger : k.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(Icons.mic_rounded, color: k.onPrimary, size: size * 0.42),
+                              ? Icon(
+                                  Icons.mic_rounded,
+                                  key: ValueKey(talk),
+                                  color: cancel ? k.danger : k.onPrimary,
+                                  size: size * 0.42,
                                 )
-                              : Icon(
-                                  Icons.add_rounded,
+                              : KSvgIcon(
+                                  KIcons.add,
                                   key: const ValueKey('plus'),
-                                  size: size * 0.48,
-                                  color: k.primary,
+                                  color: k.onPrimary,
+                                  size: size * _plusScale,
                                 ),
                         ),
                       ),
@@ -256,10 +263,11 @@ class _Menu extends StatelessWidget {
               child: GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
                 child: KLiquidGlass(
+                  tint: k.tabAdd,
                   child: Center(
                     child: RotationTransition(
                       turns: Tween(begin: 0.0, end: 0.125).animate(grow),
-                      child: Icon(Icons.add_rounded, size: anchor.shortestSide * 0.48, color: k.primary),
+                      child: KSvgIcon(KIcons.add, size: anchor.shortestSide * _plusScale, color: k.onPrimary),
                     ),
                   ),
                 ),

@@ -37,6 +37,10 @@ final class KColors extends ThemeExtension<KColors> {
     required this.accentSoft,
     required this.neutralSoft,
     required this.chartMuted,
+    required this.tabIdle,
+    required this.tabSelected,
+    required this.tabPill,
+    required this.tabAdd,
   });
 
   final Color background;
@@ -81,6 +85,14 @@ final class KColors extends ThemeExtension<KColors> {
   /// the page, the WCAG minimum for graphics.
   final Color chartMuted;
 
+  /// The tab bar, from the tab-icons spec: idle icons, the selected icon,
+  /// the pill behind it, and the + button, which stays this blue in dark
+  /// mode too, with a white plus.
+  final Color tabIdle;
+  final Color tabSelected;
+  final Color tabPill;
+  final Color tabAdd;
+
   static const light = KColors(
     background: Color(0xFFFFFFFF),
     surface: Color(0xFFFFFFFF),
@@ -114,6 +126,10 @@ final class KColors extends ThemeExtension<KColors> {
     accentSoft: Color(0xFFDDE4FF),
     neutralSoft: Color(0xFFECEEF2),
     chartMuted: Color(0xFF8D94A1),
+    tabIdle: Color(0xFF626873),
+    tabSelected: Color(0xFF2348DE),
+    tabPill: Color(0xFFE9EEFF),
+    tabAdd: Color(0xFF2348DE),
   );
 
   /// Not in the canvas; derived so the app is usable in dark mode.
@@ -150,6 +166,10 @@ final class KColors extends ThemeExtension<KColors> {
     accentSoft: Color(0xFF1D2547),
     neutralSoft: Color(0xFF1E222B),
     chartMuted: Color(0xFF5A606C),
+    tabIdle: Color(0xFFA3A9B5),
+    tabSelected: Color(0xFFA9BCFF),
+    tabPill: Color(0xFF27305A),
+    tabAdd: Color(0xFF2348DE),
   );
 
   @override

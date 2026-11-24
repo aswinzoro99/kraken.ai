@@ -20,17 +20,12 @@ class HomeShell extends StatefulWidget {
   final StatefulNavigationShell shell;
 
   static const tabs = [
-    (KNavItem(label: 'Home', icon: Icons.home_outlined, selectedIcon: Icons.home_rounded), 'home'),
-    (KNavItem(label: 'Friends', icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded), 'friends'),
-    (KNavItem(label: 'Insights', icon: Icons.insights_outlined, selectedIcon: Icons.insights_rounded), 'insights'),
-    (
-      KNavItem(label: 'Activity', icon: Icons.receipt_long_outlined, selectedIcon: Icons.receipt_long_rounded),
-      'activity',
-    ),
-    (
-      KNavItem(label: 'Account', icon: Icons.account_circle_outlined, selectedIcon: Icons.account_circle_rounded),
-      'account',
-    ),
+    (KNavItem(label: 'Home', icon: KTabIcon.home), 'home'),
+    (KNavItem(label: 'Friends', icon: KTabIcon.friends), 'friends'),
+    (KNavItem(label: 'Insights', icon: KTabIcon.insights), 'insights'),
+    (KNavItem(label: 'Activity', icon: KTabIcon.activity), 'activity'),
+    // The person's avatar, not an icon; the name comes from the session.
+    (KNavItem.avatar(label: 'Account', name: ''), 'account'),
   ];
 
   /// What the + offers, most used first. Holding the + is the fast way to
@@ -114,10 +109,7 @@ class _HomeShellState extends State<HomeShell> {
     };
     final items = [
       for (final (item, key) in HomeShell.tabs)
-        // The profile tab shows the person's avatar, as on Instagram.
-        key == 'account' && name != null
-            ? KNavItem(label: item.label, icon: item.icon, selectedIcon: item.selectedIcon, avatarName: name)
-            : item,
+        key == 'account' ? KNavItem.avatar(label: item.label, name: name ?? '') : item,
     ];
     return Scaffold(
       extendBody: true,

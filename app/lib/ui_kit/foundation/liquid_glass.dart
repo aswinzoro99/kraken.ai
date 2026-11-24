@@ -7,6 +7,9 @@ import 'package:material_ui/material_ui.dart';
 /// a bright specular rim where light catches the edge, a soft sheen across
 /// the top, and a shadow that lifts it off the page.
 ///
+/// [tint] makes tinted glass for a prominent control, like the + button:
+/// the colour fills the glass, which keeps its sheen, rim and shadow.
+///
 /// With Increase Contrast on it becomes a solid surface with a defined edge.
 class KLiquidGlass extends StatelessWidget {
   const KLiquidGlass({
@@ -14,6 +17,7 @@ class KLiquidGlass extends StatelessWidget {
     required this.child,
     this.borderRadius = const BorderRadius.all(Radius.circular(999)),
     this.elevated = true,
+    this.tint,
   });
 
   final Widget child;
@@ -21,6 +25,9 @@ class KLiquidGlass extends StatelessWidget {
 
   /// Floating pieces cast a shadow.
   final bool elevated;
+
+  /// Fills the glass with a colour.
+  final Color? tint;
 
   static List<double> _saturation(double s) {
     const r = 0.2126, g = 0.7152, b = 0.0722;
@@ -32,52 +39,61 @@ class KLiquidGlass extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final solid = MediaQuery.maybeHighContrastOf(context) ?? false;
-    final fill = solid
-        ? (dark ? const Color(0xFF1C1C1E) : Colors.white)
-        : (dark ? const Color(0xFF26282E).withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.52));
+    final tint = this.tint;
+    final fill =
+        tint ??
+        (solid
+            ? (dark ? const Color(0xFF1C1C1E) : Colors.white)
+            : (dark ? const Color(0xFF26282E).withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.52)));
+    // A sheen strong enough to read on clear glass looks glossy on colour.
+    final sheen = tint != null ? (dark ? 0.10 : 0.18) : (dark ? 0.08 : 0.32);
 
-    final glass = ClipRRect(
-      borderRadius: borderRadius,
-      child: BackdropFilter(
-        filter: solid
-            ? ImageFilter.blur()
-            : ImageFilter.compose(
-                outer: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-                inner: ColorFilter.matrix(_saturation(1.8)),
-              ),
-        child: Stack(
-          children: [
-            Positioned.fill(child: ColoredBox(color: fill)),
-            child,
-            // Light falling across the top of the glass.
-            if (!solid)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.center,
-                        colors: [
-                          Colors.white.withValues(alpha: dark ? 0.08 : 0.32),
-                          Colors.white.withValues(alpha: 0),
-                        ],
-                      ),
-                    ),
+    final layers = Stack(
+      children: [
+        Positioned.fill(child: ColoredBox(color: fill)),
+        child,
+        // Light falling across the top of the glass.
+        if (!solid)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.center,
+                    colors: [
+                      Colors.white.withValues(alpha: sheen),
+                      Colors.white.withValues(alpha: 0),
+                    ],
                   ),
                 ),
               ),
-            // The specular rim.
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _RimPainter(borderRadius, dark: dark, solid: solid),
-                ),
-              ),
             ),
-          ],
+          ),
+        // The specular rim.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: _RimPainter(borderRadius, dark: dark, solid: solid),
+            ),
+          ),
         ),
-      ),
+      ],
+    );
+    final glass = ClipRRect(
+      borderRadius: borderRadius,
+      // Opaque tinted glass hides what's behind it, so there's nothing to blur.
+      child: tint != null && tint.a >= 1
+          ? layers
+          : BackdropFilter(
+              filter: solid
+                  ? ImageFilter.blur()
+                  : ImageFilter.compose(
+                      outer: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                      inner: ColorFilter.matrix(_saturation(1.8)),
+                    ),
+              child: layers,
+            ),
     );
     if (!elevated) return glass;
     return DecoratedBox(

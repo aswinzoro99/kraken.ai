@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/haptics/haptics.dart';
 import '../foundation/haptics_scope.dart';
+import '../foundation/k_icons.dart';
 import '../foundation/liquid_glass.dart';
 import '../theme/kraken_theme.dart';
 import '../tokens/motion.dart';
@@ -13,20 +14,23 @@ import '../tokens/typography.dart';
 import 'k_avatar.dart';
 
 final class KNavItem {
-  const KNavItem({required this.label, required this.icon, required this.selectedIcon, this.avatarName});
+  /// A tab drawn with one of Kraken's tab icons.
+  const KNavItem({required this.label, required KTabIcon this.icon}) : avatarName = null;
+
+  /// The profile tab: the person's avatar (their initial, until there are
+  /// photos) instead of an icon. A blank [name] shows a generic person.
+  const KNavItem.avatar({required this.label, required String name}) : avatarName = name, icon = null;
 
   /// Not shown; read out by screen readers.
   final String label;
-  final IconData icon;
-  final IconData selectedIcon;
-
-  /// Shows this person's avatar instead of the icon (the profile tab).
+  final KTabIcon? icon;
   final String? avatarName;
 }
 
-/// The tab bar, in Liquid Glass and Instagram's iOS style: a floating
-/// capsule of icons, no labels, monochrome, with the selected tab filled and
-/// sitting in a glass lens. Drag along the bar and the lens follows the
+/// The tab bar: a floating Liquid Glass capsule of icons with no labels,
+/// in the style of Instagram on iOS. Idle tabs show the outline icon in
+/// grey; the selected tab shows the filled icon in blue, on a pill that
+/// springs from tab to tab. Drag along the bar and the pill follows the
 /// finger, ticking as it crosses each tab; let go and it lands where the
 /// flick was heading.
 ///
@@ -93,7 +97,7 @@ class _KBottomNavState extends State<KBottomNav> with SingleTickerProviderStateM
       _lens.value = index.toDouble();
       return;
     }
-    // From wherever the lens is now, so a new tap mid-flight redirects it.
+    // From wherever the pill is now, so a new tap mid-flight redirects it.
     _lens.animateWith(SpringSimulation(spring, _lens.value, index.toDouble(), velocity));
   }
 
@@ -115,7 +119,7 @@ class _KBottomNavState extends State<KBottomNav> with SingleTickerProviderStateM
   void _follow(double dx) {
     final max = (_n - 1).toDouble();
     var at = dx / _slot - 0.5;
-    // Past either end the lens resists instead of stopping dead.
+    // Past either end the pill resists instead of stopping dead.
     if (at < 0) at = -KSpring.rubberband(-at, 1);
     if (at > max) at = max + KSpring.rubberband(at - max, 1);
     _lens.value = at;
@@ -169,7 +173,7 @@ class _KBottomNavState extends State<KBottomNav> with SingleTickerProviderStateM
                     key: KBottomNav.capsuleKey,
                     width: width,
                     height: barHeight,
-                    child: KLiquidGlass(child: _tabs(width, barHeight)),
+                    child: KLiquidGlass(child: _tabs(width, barHeight, t)),
                   ),
                   if (widget.trailing != null) ...[
                     SizedBox(width: gap),
@@ -184,11 +188,12 @@ class _KBottomNavState extends State<KBottomNav> with SingleTickerProviderStateM
     );
   }
 
-  Widget _tabs(double width, double height) {
+  Widget _tabs(double width, double height, double t) {
     _slot = width / _n;
     final active = _dragging ? _hover : widget.selectedIndex;
     final inset = height * 0.09;
-    final iconSize = height * 0.45;
+    // The icons are drawn at 24 pt; they shrink to 20 with the bar.
+    final iconSize = lerpDouble(24, 20, t)!;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onHorizontalDragStart: _dragStart,
@@ -206,11 +211,11 @@ class _KBottomNavState extends State<KBottomNav> with SingleTickerProviderStateM
               child: child!,
             ),
             child: AnimatedScale(
-              // The lens swells while it's being dragged, like a droplet.
+              // The pill swells while it's being dragged, like a droplet.
               scale: _dragging ? 1.1 : 1,
               duration: _reduceMotion ? Duration.zero : const Duration(milliseconds: 250),
               curve: _curve,
-              child: const _Lens(),
+              child: const _Pill(),
             ),
           ),
           Row(
@@ -227,25 +232,16 @@ class _KBottomNavState extends State<KBottomNav> with SingleTickerProviderStateM
   }
 }
 
-/// The glass droplet behind the selected tab.
-class _Lens extends StatelessWidget {
-  const _Lens();
+/// The pill behind the selected tab.
+class _Pill extends StatelessWidget {
+  const _Pill();
 
   @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: dark ? Colors.white.withValues(alpha: 0.13) : Colors.black.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: dark ? 0.12 : 0.6), width: 0.8),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(color: context.k.tabPill, borderRadius: BorderRadius.circular(999)),
+  );
 }
 
-/// One tab: an icon, filled when selected, in the ink colour. The profile
-/// tab shows the person's avatar, ringed when selected.
 class _TabItem extends StatelessWidget {
   const _TabItem({required this.item, required this.selected, required this.size, required this.onTap});
   final KNavItem item;
@@ -255,11 +251,7 @@ class _TabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final k = context.k;
-    final name = item.avatarName;
-    final Widget glyph = name == null
-        ? Icon(selected ? item.selectedIcon : item.icon, size: size, color: k.ink)
-        : _ProfileGlyph(name: name, size: size + 4, selected: selected);
+    final icon = item.icon;
     return Semantics(
       button: true,
       selected: selected,
@@ -268,14 +260,54 @@ class _TabItem extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Center(child: glyph),
+        child: Center(
+          child: icon == null
+              ? _ProfileGlyph(name: item.avatarName ?? '', size: size + 4, selected: selected)
+              : _TabGlyph(icon: icon, size: size, selected: selected),
+        ),
       ),
     );
   }
 }
 
-/// The profile tab: the person's initial in a circle the size of an icon,
-/// ringed in ink when selected (Instagram uses the profile photo here).
+/// The outline icon in grey, cross-fading to the filled icon in blue when
+/// the tab is selected. Both stay loaded, so switching never flickers. The
+/// fade isn't movement, so it stays under Reduce Motion.
+class _TabGlyph extends StatelessWidget {
+  const _TabGlyph({required this.icon, required this.size, required this.selected});
+  final KTabIcon icon;
+  final double size;
+  final bool selected;
+
+  static const _fade = Duration(milliseconds: 180);
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.k;
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          AnimatedOpacity(
+            opacity: selected ? 0 : 1,
+            duration: _fade,
+            child: KSvgIcon(icon.outline, color: k.tabIdle, size: size),
+          ),
+          AnimatedOpacity(
+            opacity: selected ? 1 : 0,
+            duration: _fade,
+            child: KSvgIcon(icon.filled, color: k.tabSelected, size: size),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The profile tab: the person's initial in a circle about the size of an
+/// icon, in the tab colours, ringed when selected. Instagram uses the
+/// profile photo here; Kraken will too once there are photos.
 class _ProfileGlyph extends StatelessWidget {
   const _ProfileGlyph({required this.name, required this.size, required this.selected});
   final String name;
@@ -285,21 +317,29 @@ class _ProfileGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final k = context.k;
+    final color = selected ? k.tabSelected : k.tabIdle;
     return Container(
       width: size,
       height: size,
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: selected ? k.ink : Colors.transparent, width: 1.6),
+        border: Border.all(color: selected ? k.tabSelected : Colors.transparent, width: 1.6),
       ),
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(color: k.surfaceMuted, shape: BoxShape.circle),
-        child: Text(
-          KAvatar.initialsOf(name).characters.first,
-          style: KText.label.copyWith(color: k.ink, fontSize: size * 0.42, fontWeight: FontWeight.w600, height: 1),
-        ),
+        child: name.trim().isEmpty
+            ? Icon(Icons.person_rounded, size: size * 0.55, color: color)
+            : Text(
+                KAvatar.initialsOf(name).characters.first,
+                style: KText.label.copyWith(
+                  color: color,
+                  fontSize: size * 0.42,
+                  fontWeight: FontWeight.w600,
+                  height: 1,
+                ),
+              ),
       ),
     );
   }

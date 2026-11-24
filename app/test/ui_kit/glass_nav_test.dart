@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kraken/core/haptics/haptics.dart';
 import 'package:kraken/core/storage/key_value_store.dart';
@@ -5,12 +6,21 @@ import 'package:kraken/ui_kit/ui_kit.dart';
 import 'package:material_ui/material_ui.dart';
 
 const items = [
-  KNavItem(label: 'Home', icon: Icons.home_outlined, selectedIcon: Icons.home_rounded),
-  KNavItem(label: 'Friends', icon: Icons.person_outline, selectedIcon: Icons.person),
-  KNavItem(label: 'Insights', icon: Icons.insights_outlined, selectedIcon: Icons.insights),
-  KNavItem(label: 'Activity', icon: Icons.receipt_long_outlined, selectedIcon: Icons.receipt_long),
-  KNavItem(label: 'Account', icon: Icons.account_circle_outlined, selectedIcon: Icons.account_circle),
+  KNavItem(label: 'Home', icon: KTabIcon.home),
+  KNavItem(label: 'Friends', icon: KTabIcon.friends),
+  KNavItem(label: 'Insights', icon: KTabIcon.insights),
+  KNavItem(label: 'Activity', icon: KTabIcon.activity),
+  KNavItem.avatar(label: 'Account', name: 'Aarav'),
 ];
+
+Finder svg(String asset) => find.byWidgetPredicate((w) => w is KSvgIcon && w.asset == asset);
+
+/// Whether [asset] is showing: its cross-fade is at full opacity.
+bool shown(WidgetTester tester, String asset) =>
+    tester
+        .widget<AnimatedOpacity>(find.ancestor(of: svg(asset), matching: find.byType(AnimatedOpacity)).first)
+        .opacity ==
+    1;
 
 /// The + sits in a square, as the tab bar gives it.
 Widget button(Widget child) => Align(
@@ -21,11 +31,11 @@ Widget button(Widget child) => Align(
   ),
 );
 
-Future<RecordingHapticsEngine> host(WidgetTester tester, Widget child, {Widget? body}) async {
+Future<RecordingHapticsEngine> host(WidgetTester tester, Widget child, {Widget? body, bool dark = false}) async {
   final engine = RecordingHapticsEngine();
   await tester.pumpWidget(
     MaterialApp(
-      theme: KrakenTheme.light(),
+      theme: dark ? KrakenTheme.dark() : KrakenTheme.light(),
       home: HapticsScope(
         haptics: Haptics(engine, MemoryStore()),
         child: Scaffold(extendBody: true, body: body ?? const SizedBox.expand(), bottomNavigationBar: child),
@@ -106,25 +116,63 @@ void main() {
       expect(picked, [4]);
     });
 
-    testWidgets('the profile tab can show the person’s avatar', (tester) async {
+    testWidgets('the selected tab shows its filled icon, the others their outlines', (tester) async {
+      await host(tester, const _Bar());
+      expect(shown(tester, KTabIcon.home.filled), isTrue);
+      expect(shown(tester, KTabIcon.home.outline), isFalse);
+      for (final icon in [KTabIcon.friends, KTabIcon.insights, KTabIcon.activity]) {
+        expect(shown(tester, icon.outline), isTrue, reason: icon.name);
+        expect(shown(tester, icon.filled), isFalse, reason: icon.name);
+      }
+      await tester.tap(find.bySemanticsLabel('Insights'));
+      await tester.pumpAndSettle();
+      expect(shown(tester, KTabIcon.insights.filled), isTrue);
+      expect(shown(tester, KTabIcon.home.outline), isTrue);
+    });
+
+    for (final dark in [false, true]) {
+      testWidgets('icons and the pill use the ${dark ? 'dark' : 'light'} theme colours', (tester) async {
+        await host(tester, const _Bar(), dark: dark);
+        final k = dark ? KColors.dark : KColors.light;
+        expect(tester.widget<KSvgIcon>(svg(KTabIcon.home.filled)).color, k.tabSelected);
+        expect(tester.widget<KSvgIcon>(svg(KTabIcon.friends.outline)).color, k.tabIdle);
+        final pill = find.byWidgetPredicate(
+          (w) =>
+              w is DecoratedBox && w.decoration is BoxDecoration && (w.decoration as BoxDecoration).color == k.tabPill,
+        );
+        expect(pill, findsOneWidget);
+      });
+    }
+
+    testWidgets('the profile tab shows the person’s initial, in blue when selected', (tester) async {
+      await host(tester, KBottomNav(items: items, selectedIndex: 4, onSelected: (_) {}));
+      expect(tester.widget<Text>(find.text('A')).style?.color, KColors.light.tabSelected);
+    });
+
+    testWidgets('before a name is known, the profile tab shows a generic person', (tester) async {
       await host(
         tester,
         KBottomNav(
           items: [
             ...items.take(4),
-            const KNavItem(
-              label: 'Account',
-              icon: Icons.account_circle_outlined,
-              selectedIcon: Icons.account_circle,
-              avatarName: 'Aarav',
-            ),
+            const KNavItem.avatar(label: 'Account', name: ''),
           ],
           selectedIndex: 0,
           onSelected: (_) {},
         ),
       );
-      expect(find.text('A'), findsOneWidget);
+      expect(find.byIcon(Icons.person_rounded), findsOneWidget);
     });
+  });
+
+  testWidgets('every icon file is bundled', (tester) async {
+    final files = [
+      for (final icon in KTabIcon.values) ...[icon.outline, icon.filled],
+      KIcons.add,
+    ];
+    for (final file in files) {
+      expect(await rootBundle.loadString(file), startsWith('<svg'), reason: file);
+    }
   });
 
   group('quick actions', () {
@@ -132,6 +180,18 @@ void main() {
       KQuickAction(id: 'scan', label: 'Scan a bill', description: 'Photo', icon: Icons.document_scanner_outlined),
       KQuickAction(id: 'add', label: 'Add expense', description: 'Type it', icon: Icons.edit_note_rounded),
     ];
+
+    for (final dark in [false, true]) {
+      testWidgets('the + is blue with a white plus in ${dark ? 'dark' : 'light'} mode', (tester) async {
+        await host(
+          tester,
+          button(KQuickActionButton(actions: actions, onAction: (_) {}, onTalk: (_) {})),
+          dark: dark,
+        );
+        expect(tester.widget<KLiquidGlass>(find.byType(KLiquidGlass)).tint, const Color(0xFF2348DE));
+        expect(tester.widget<KSvgIcon>(svg(KIcons.add)).color, const Color(0xFFFFFFFF));
+      });
+    }
 
     testWidgets('tap opens the menu; picking an action closes it and reports it', (tester) async {
       KQuickAction? picked;

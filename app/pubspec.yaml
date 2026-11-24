@@ -13,6 +13,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_bloc: 9.1.1
+  flutter_svg: 2.5.0
   go_router: 18.1.4
   intl: 0.20.3
   ledger:
@@ -29,6 +30,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Tab bar icons from the design (24 x 24, one colour, tinted in code).
+  assets:
+    - assets/icons/
   fonts:
     - family: Poppins
       fonts:
