@@ -51,7 +51,7 @@ class DebugScreen extends StatelessWidget {
             KGroupedList(
               children: [
                 KNavRow(title: 'Flavor', value: config.flavor.name),
-                KNavRow(title: 'API', value: config.apiBaseUrl.host),
+                KNavRow(title: 'Backend', value: config.supabaseUrl.host),
                 KNavRow(title: 'Policy version', value: config.privacyPolicyVersion),
                 KNavRow(title: 'Session', value: session.runtimeType.toString()),
               ],

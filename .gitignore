@@ -7,6 +7,3 @@ build/
 .vscode/
 app/tool/icons/out/
 
-# Firebase emulator logs
-firebase/*-debug.log
-firebase/*.log

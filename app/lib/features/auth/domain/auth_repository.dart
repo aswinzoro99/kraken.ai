@@ -58,6 +58,22 @@ final class NoCodeRequested extends AuthFailure {
   String get code => 'no_code_requested';
 }
 
+/// The code didn't work, and the server won't say whether it was wrong or
+/// expired (Supabase answers both the same way).
+final class CodeRejected extends AuthFailure {
+  const CodeRejected();
+  @override
+  String get code => 'code_rejected';
+}
+
+/// Apple or Google sign-in isn't set up in this build yet.
+final class ProviderUnavailable extends AuthFailure {
+  const ProviderUnavailable(this.provider);
+  final SocialProvider provider;
+  @override
+  String get code => 'provider_unavailable';
+}
+
 /// The person closed the Apple or Google sheet. Not an error to show.
 final class SignInCancelled extends AuthFailure {
   const SignInCancelled();

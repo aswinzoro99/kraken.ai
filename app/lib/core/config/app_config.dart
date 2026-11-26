@@ -6,7 +6,8 @@ final class AppConfig {
   const AppConfig({
     required this.flavor,
     required this.appName,
-    required this.apiBaseUrl,
+    required this.supabaseUrl,
+    this.supabaseAnonKey = '',
     required this.privacyPolicyUrl,
     required this.termsUrl,
     required this.privacyPolicyVersion,
@@ -18,7 +19,8 @@ final class AppConfig {
     Flavor.mock => AppConfig(
       flavor: flavor,
       appName: 'Kraken Mock',
-      apiBaseUrl: Uri.parse('http://localhost:8080'),
+      // Unused: the mock flavor never talks to a backend.
+      supabaseUrl: Uri.parse('http://localhost'),
       privacyPolicyUrl: Uri.parse('https://kraken-dev.web.app/privacy'),
       termsUrl: Uri.parse('https://kraken-dev.web.app/terms'),
       privacyPolicyVersion: _policyVersion,
@@ -27,7 +29,8 @@ final class AppConfig {
     Flavor.dev => AppConfig(
       flavor: flavor,
       appName: 'Kraken Dev',
-      apiBaseUrl: Uri.parse('https://kraken-api-dev.asia-south1.run.app'),
+      supabaseUrl: _supabaseUrl,
+      supabaseAnonKey: _supabaseAnonKey,
       privacyPolicyUrl: Uri.parse('https://kraken-dev.web.app/privacy'),
       termsUrl: Uri.parse('https://kraken-dev.web.app/terms'),
       privacyPolicyVersion: _policyVersion,
@@ -36,7 +39,8 @@ final class AppConfig {
     Flavor.prod => AppConfig(
       flavor: flavor,
       appName: 'Kraken',
-      apiBaseUrl: Uri.parse('https://kraken-api.asia-south1.run.app'),
+      supabaseUrl: _supabaseUrl,
+      supabaseAnonKey: _supabaseAnonKey,
       privacyPolicyUrl: Uri.parse('https://kraken-prod.web.app/privacy'),
       termsUrl: Uri.parse('https://kraken-prod.web.app/terms'),
       privacyPolicyVersion: _policyVersion,
@@ -44,12 +48,22 @@ final class AppConfig {
     ),
   };
 
+  /// The Supabase project (phantom-services). The anon key is public by
+  /// design: it's in every copy of the app, and row-level security decides
+  /// what it can reach. Dev and prod share one project until there are two.
+  static final _supabaseUrl = Uri.parse('https://pimootoxquuxfsweuquh.supabase.co');
+  static const _supabaseAnonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpbW9vdG94cXV1eGZzd2V1cXVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU2ODA5NDgsImV4cCI6MjExMTI1Njk0OH0.w0hi5lfQMmYmrO5K61X0J2b8MIrtLhjRlMaVptUmTB8';
+
   /// Bump when the privacy policy text changes; people are asked again.
   static const _policyVersion = '2026-11-24';
 
   final Flavor flavor;
   final String appName;
-  final Uri apiBaseUrl;
+
+  /// The backend: phantom-services on Supabase.
+  final Uri supabaseUrl;
+  final String supabaseAnonKey;
   final Uri privacyPolicyUrl;
   final Uri termsUrl;
   final String privacyPolicyVersion;
@@ -63,7 +77,8 @@ final class AppConfig {
   AppConfig copyWith({Duration? chatPacing, bool? showDebugTools}) => AppConfig(
     flavor: flavor,
     appName: appName,
-    apiBaseUrl: apiBaseUrl,
+    supabaseUrl: supabaseUrl,
+    supabaseAnonKey: supabaseAnonKey,
     privacyPolicyUrl: privacyPolicyUrl,
     termsUrl: termsUrl,
     privacyPolicyVersion: privacyPolicyVersion,

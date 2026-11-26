@@ -43,6 +43,7 @@ enum Line {
   badCodeShape,
   wrongCode,
   codeExpired,
+  codeRejected,
   tooManyAttempts,
   resendTooSoon,
   askEmailAgain,
@@ -490,9 +491,13 @@ final class OnboardingMachine {
     return switch (failure) {
       WrongCode(:final attemptsLeft) => Step(back, say: [BotLine(Line.wrongCode, count: attemptsLeft)]),
       CodeExpired() || NoCodeRequested() => Step(back, say: const [BotLine(Line.codeExpired)]),
+      CodeRejected() => Step(back, say: const [BotLine(Line.codeRejected)]),
       TooManyAttempts() => Step(back, say: const [BotLine(Line.tooManyAttempts)]),
       // The chat only signs in by email, so a cancelled Apple/Google sheet never reaches here.
-      AuthNetworkFailure() || ResendTooSoon() || SignInCancelled() => Step(back, say: const [BotLine(Line.network)]),
+      AuthNetworkFailure() ||
+      ResendTooSoon() ||
+      SignInCancelled() ||
+      ProviderUnavailable() => Step(back, say: const [BotLine(Line.network)]),
     };
   }
 

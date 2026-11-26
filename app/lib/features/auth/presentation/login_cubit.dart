@@ -189,10 +189,13 @@ class LoginCubit extends Cubit<LoginState> {
     WrongCode(:final attemptsLeft) =>
       "That code isn't right. $attemptsLeft ${attemptsLeft == 1 ? 'try' : 'tries'} left.",
     CodeExpired() => 'That code has expired. Send a new one.',
+    CodeRejected() => "That code didn't work. Check the digits, or send a new one.",
     TooManyAttempts() => 'Too many tries. Send a new code.',
     ResendTooSoon(:final wait) => 'Wait ${wait.inSeconds + 1} seconds before asking for another code.',
     NoCodeRequested() => 'Ask for a code first.',
     AuthNetworkFailure() => "Couldn't reach Kraken. Check your connection and try again.",
+    ProviderUnavailable(:final provider) =>
+      "${provider == SocialProvider.apple ? 'Apple' : 'Google'} sign-in isn't set up yet. Use your email for now.",
     SignInCancelled() => null,
   };
 }

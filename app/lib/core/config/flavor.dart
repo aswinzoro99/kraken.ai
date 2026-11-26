@@ -2,8 +2,9 @@
 ///
 /// * [mock] runs entirely on fakes: no network, no Firebase. Use it for UI
 ///   work and demos.
-/// * [dev] talks to the `kraken-dev` Firebase project.
-/// * [prod] talks to `kraken-prod`.
+/// * [dev] talks to the Supabase project (phantom-services): real sign-in
+///   and profiles; groups are still sample data until Phase 2.
+/// * [prod] the release build (same project until there are two).
 enum Flavor {
   mock,
   dev,
