@@ -174,15 +174,23 @@ class LoginCubit extends Cubit<LoginState> {
   }
 
   /// Keeps the name we already know, so sign-up doesn't ask again.
+  ///
+  /// The person is signed in by now, so a failure here (offline) mustn't
+  /// block them: the name is just asked for again on "Almost done".
   Future<void> _signedIn(AppUser user, {String? name}) async {
-    final profile = await _profiles.fetch(user.uid);
-    final newUser = profile == null || !profile.isCompleteFor(_policyVersion);
-    final known = name == null ? null : DisplayName.tryParse(name);
-    if (newUser && known != null && profile?.displayName == null) {
-      await _profiles.save((profile ?? UserProfile(uid: user.uid)).copyWith(displayName: known.value));
+    try {
+      final profile = await _profiles.fetch(user.uid);
+      final newUser = profile == null || !profile.isCompleteFor(_policyVersion);
+      final known = name == null ? null : DisplayName.tryParse(name);
+      if (newUser && known != null && profile?.displayName == null) {
+        await _profiles.save((profile ?? UserProfile(uid: user.uid)).copyWith(displayName: known.value));
+      }
+      _analytics.log(SignInCompleted(newUser: newUser));
+    } on Object {
+      _analytics.log(const SignInFailed('profile_unavailable'));
+    } finally {
+      if (!isClosed) emit(state.copyWith(busy: LoginBusy.none));
     }
-    _analytics.log(SignInCompleted(newUser: newUser));
-    if (!isClosed) emit(state.copyWith(busy: LoginBusy.none));
   }
 
   static String? describe(AuthFailure failure) => switch (failure) {

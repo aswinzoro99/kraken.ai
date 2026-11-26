@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../../core/result/result.dart';
@@ -24,17 +26,32 @@ final class SupabaseAuthRepository implements AuthRepository {
   @override
   AppUser? get currentUser => _map(_auth.currentUser);
 
+  /// The person now, then each change. Supabase reports some failures (a
+  /// token refresh while offline) as stream errors; those mustn't end the
+  /// watch, or sign-in and sign-out would stop registering. After one, the
+  /// current user is checked again (Supabase may have signed them out).
   @override
-  Stream<AppUser?> watchUser() async* {
-    String? last = '';
-    yield currentUser;
-    last = currentUser?.uid;
-    await for (final change in _auth.onAuthStateChange) {
-      final user = _map(change.session?.user);
-      if (user?.uid == last) continue;
+  Stream<AppUser?> watchUser() {
+    late final StreamController<AppUser?> out;
+    StreamSubscription<sb.AuthState>? sub;
+    String? last;
+    void push(AppUser? user, {bool always = false}) {
+      if (!always && user?.uid == last) return;
       last = user?.uid;
-      yield user;
+      out.add(user);
     }
+
+    out = StreamController<AppUser?>(
+      onListen: () {
+        push(currentUser, always: true);
+        sub = _auth.onAuthStateChange.listen(
+          (change) => push(_map(change.session?.user)),
+          onError: (Object _) => push(currentUser),
+        );
+      },
+      onCancel: () => sub?.cancel(),
+    );
+    return out.stream;
   }
 
   /// "…you can only request this after 27 seconds." → 27 s.

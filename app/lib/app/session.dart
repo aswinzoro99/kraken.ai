@@ -44,7 +44,8 @@ class SessionCubit extends Cubit<SessionState> {
     required this._crash,
     required this._policyVersion,
   }) : super(const SessionLoading()) {
-    _userSub = auth.watchUser().listen(_onUser);
+    // Errors are reported, never fatal: the session must keep following.
+    _userSub = auth.watchUser().listen(_onUser, onError: _report);
   }
 
   final ProfileRepository _profiles;
@@ -69,8 +70,10 @@ class SessionCubit extends Cubit<SessionState> {
             ? ReadySession(user, profile)
             : OnboardingSession(user, profile),
       );
-    });
+    }, onError: _report);
   }
+
+  void _report(Object error, StackTrace stack) => _crash.recordError(error, stack, reason: 'session stream');
 
   @override
   Future<void> close() async {

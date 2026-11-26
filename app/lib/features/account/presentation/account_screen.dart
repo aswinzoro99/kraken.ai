@@ -69,9 +69,21 @@ class _AccountScreenState extends State<AccountScreen> {
     if (!mounted) return;
     final profiles = context.read<ProfileRepository>();
     final auth = context.read<AuthRepository>();
-    await context.analytics.log(const AccountDeleted());
-    await profiles.delete(uid);
-    await auth.deleteAccount();
+    final analytics = context.analytics;
+    // The account first: if that fails, nothing has changed and the person
+    // stays here. (On Supabase the server removes the profile with it.)
+    try {
+      await auth.deleteAccount();
+    } on Object {
+      if (mounted) KToast.show(context, "Couldn't delete your account. Check your connection and try again.");
+      return;
+    }
+    await analytics.log(const AccountDeleted());
+    try {
+      await profiles.delete(uid);
+    } on Object {
+      // Already signed out; a leftover local profile is harmless.
+    }
   }
 
   @override

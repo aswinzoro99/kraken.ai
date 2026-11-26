@@ -112,7 +112,11 @@ final class MockAuthRepository implements AuthRepository {
   Future<void> signOut() => _setUser(null);
 
   @override
-  Future<void> deleteAccount() => _setUser(null);
+  Future<void> deleteAccount() async {
+    await _wait();
+    if (_consumeFailure()) throw StateError('mock: deletion failed (offline)');
+    await _setUser(null);
+  }
 
   Future<void> dispose() => _changes.close();
 

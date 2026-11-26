@@ -116,4 +116,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
   });
+
+  testWidgets('a failed account deletion says so and keeps you signed in', (tester) async {
+    final app = await pumpKraken(tester);
+    await openLogin(tester);
+    await tester.tap(find.bySemanticsLabel('Continue with Google'));
+    await tester.pumpAndSettle();
+    await finishSignUp(tester);
+    await tester.tap(find.bySemanticsLabel('Account'));
+    await tester.pumpAndSettle();
+
+    // The account list builds rows as they scroll in.
+    final deleteRow = find.widgetWithText(KNavRow, 'Delete account');
+    await tester.scrollUntilVisible(deleteRow, 200, scrollable: find.byType(Scrollable).last);
+    await tester.pumpAndSettle();
+    app.services.devTools.mockAuth!.failNextRequest = true;
+    await tester.tap(deleteRow);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(KButton, 'Delete account'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.textContaining("Couldn't delete your account"), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(app.services.auth.currentUser, isNotNull);
+    expect(app.services.recorder.names, isNot(contains('account_deleted')));
+
+    // Then it works (once the message has gone).
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    await tester.tap(deleteRow);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(KButton, 'Delete account'));
+    await tester.pumpAndSettle();
+    expect(app.services.auth.currentUser, isNull);
+  });
 }
