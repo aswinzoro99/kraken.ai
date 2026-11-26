@@ -1,25 +1,411 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:ledger/ledger.dart';
 
+import '../../../core/storage/key_value_store.dart';
 import '../../../core/time/clock.dart';
 import '../domain/expense.dart';
 import '../domain/group.dart';
 import '../domain/group_ledger.dart';
 
-/// The groups from the design canvas, with six months of history built
-/// relative to today, so Home always has a current month to show.
+/// Groups, expenses and invites kept on this phone: the stand-in until the
+/// groups server exists. Everything a server would do (ids, activity
+/// entries, invite checks, "two people can't take the same name") happens
+/// here, so screens behave as they will for real.
 ///
-/// Balances match the design exactly: Goa Trip −₹150, Flat 302 +₹2,180,
-/// Weekend trek +₹840, Office lunch settled. Past months are settled.
+/// With [seed], everyone signed in sees the design canvas's groups as "me"
+/// (rebuilt relative to today on each launch, never saved). Without it,
+/// groups start empty and, given a [store], are saved on the phone.
+///
+/// Invites only reach people signed in on this same phone, since nothing
+/// leaves it.
 final class MockGroupsRepository implements GroupsRepository {
-  const MockGroupsRepository({this.clock = systemClock, this.empty = false});
+  MockGroupsRepository({this.clock = systemClock, this.seed = true, this.empty = false, KeyValueStore? store})
+    : _store = seed ? null : store {
+    if (seed && !empty) {
+      _load(buildMockLedgers(clock()));
+    } else {
+      _restore();
+    }
+  }
 
   final Clock clock;
 
+  /// Start with the sample groups.
+  final bool seed;
+
   /// Start with no groups, to see the empty state.
   final bool empty;
+  final KeyValueStore? _store;
+
+  static const storeKey = 'groups.mock_state.v1';
+  static const inviteLifetime = Duration(days: 7);
+
+  final _groups = <String, Group>{};
+  final _expenses = <String, List<Expense>>{};
+  final _payments = <String, List<Payment>>{};
+  final _activity = <String, List<ActivityEntry>>{};
+  final _invites = <String, Invite>{};
+  final _changes = StreamController<void>.broadcast(sync: true);
+  int _seq = 0;
+  final _random = Random();
+
+  // ---- Reading ----------------------------------------------------------
 
   @override
-  Stream<List<GroupLedger>> watchLedgers(String uid) => Stream.value(empty ? const [] : buildMockLedgers(clock()));
+  Stream<List<GroupLedger>> watchLedgers(String uid) {
+    late final StreamController<List<GroupLedger>> out;
+    StreamSubscription<void>? sub;
+    out = StreamController<List<GroupLedger>>(
+      onListen: () {
+        // Listen for changes before the first answer, so none is missed.
+        sub = _changes.stream.listen((_) => out.add(ledgersFor(uid)));
+        out.add(ledgersFor(uid));
+      },
+      // Not awaited: `.first` waits for whatever this returns.
+      onCancel: () => unawaited(sub?.cancel()),
+    );
+    return out.stream;
+  }
+
+  /// The person's groups now, most recently active first.
+  List<GroupLedger> ledgersFor(String uid) {
+    final ledgers = <GroupLedger>[];
+    for (final group in _groups.values) {
+      final me = _memberFor(group, uid);
+      if (me == null) continue;
+      ledgers.add(
+        GroupLedger(
+          group: group,
+          myMemberId: me.id,
+          expenses: _newestFirst(_expenses[group.id], (e) => e.date),
+          payments: _newestFirst(_payments[group.id], (p) => p.date),
+          activity: _newestFirst(_activity[group.id], (a) => a.date),
+        ),
+      );
+    }
+    return ledgers;
+  }
+
+  /// Sorted by date, newest first; things recorded in the same instant keep
+  /// the later one first.
+  static List<T> _newestFirst<T>(List<T>? items, DateTime Function(T) dateOf) {
+    final indexed = [for (final (i, item) in (items ?? <T>[]).indexed) (i, item)];
+    indexed.sort((a, b) {
+      final byDate = dateOf(b.$2).compareTo(dateOf(a.$2));
+      return byDate != 0 ? byDate : b.$1.compareTo(a.$1);
+    });
+    return [for (final (_, item) in indexed) item];
+  }
+
+  /// The member that is [uid] in [group]. In sample data, an unclaimed
+  /// "me" stands for whoever is signed in.
+  Member? _memberFor(Group group, String uid) {
+    for (final m in group.members) {
+      if (m.userId == uid) return m;
+    }
+    if (seed) return group.memberById('me');
+    return null;
+  }
+
+  Member _requireMember(String uid, String groupId) {
+    final group = _groups[groupId];
+    final me = group == null ? null : _memberFor(group, uid);
+    if (me == null) throw StateError('Not a member of $groupId');
+    return me;
+  }
+
+  // ---- Groups -------------------------------------------------------------
+
+  @override
+  Future<Group> createGroup({
+    required String uid,
+    required String yourName,
+    required String name,
+    List<String> friendNames = const [],
+    String detail = '',
+  }) async {
+    final id = _newId('g');
+    final now = clock();
+    final members = <Member>[Member(_newId('m'), yourName.trim(), userId: uid)];
+    final seen = {yourName.trim().toLowerCase()};
+    for (final raw in friendNames) {
+      final friend = raw.trim();
+      if (friend.isEmpty || !seen.add(friend.toLowerCase())) continue;
+      members.add(Member(_newId('m'), friend));
+    }
+    final group = Group(id: id, name: name.trim(), members: members, detail: detail.trim(), createdAt: now);
+    _groups[id] = group;
+    _log(id, ActivityKind.groupCreated, members.first.id, subject: group.name);
+    await _changed();
+    return group;
+  }
+
+  // ---- Expenses ---------------------------------------------------------
+
+  @override
+  Future<Expense> addExpense(String uid, Expense draft) async {
+    final me = _requireMember(uid, draft.groupId);
+    _check(draft);
+    final saved = Expense(
+      id: _newId('e'),
+      groupId: draft.groupId,
+      description: draft.description,
+      date: draft.date,
+      paidBy: draft.paidBy,
+      total: draft.total,
+      shares: draft.shares,
+      category: draft.category,
+      source: draft.source,
+      split: draft.split,
+      weights: draft.weights,
+      addedBy: me.id,
+    );
+    (_expenses[draft.groupId] ??= []).add(saved);
+    _log(
+      draft.groupId,
+      ActivityKind.expenseAdded,
+      me.id,
+      subject: saved.description,
+      amount: saved.total,
+      expenseId: saved.id,
+    );
+    await _changed();
+    return saved;
+  }
+
+  @override
+  Future<void> updateExpense(String uid, Expense expense) async {
+    final me = _requireMember(uid, expense.groupId);
+    _check(expense);
+    final list = _expenses[expense.groupId] ?? [];
+    final i = list.indexWhere((e) => e.id == expense.id);
+    if (i < 0) throw StateError('No expense ${expense.id}');
+    list[i] = expense;
+    _log(
+      expense.groupId,
+      ActivityKind.expenseEdited,
+      me.id,
+      subject: expense.description,
+      amount: expense.total,
+      expenseId: expense.id,
+    );
+    await _changed();
+  }
+
+  @override
+  Future<Expense> deleteExpense(String uid, String groupId, String expenseId) async {
+    final me = _requireMember(uid, groupId);
+    final list = _expenses[groupId] ?? [];
+    final i = list.indexWhere((e) => e.id == expenseId);
+    if (i < 0) throw StateError('No expense $expenseId');
+    final removed = list.removeAt(i);
+    _log(
+      groupId,
+      ActivityKind.expenseDeleted,
+      me.id,
+      subject: removed.description,
+      amount: removed.total,
+      expenseId: removed.id,
+    );
+    await _changed();
+    return removed;
+  }
+
+  @override
+  Future<void> restoreExpense(String uid, Expense expense) async {
+    final me = _requireMember(uid, expense.groupId);
+    final list = _expenses[expense.groupId] ??= [];
+    if (list.any((e) => e.id == expense.id)) return;
+    list.add(expense);
+    _log(
+      expense.groupId,
+      ActivityKind.expenseRestored,
+      me.id,
+      subject: expense.description,
+      amount: expense.total,
+      expenseId: expense.id,
+    );
+    await _changed();
+  }
+
+  /// What a server would refuse: shares that don't add up, or people who
+  /// aren't in the group.
+  void _check(Expense e) {
+    final group = _groups[e.groupId]!;
+    if (Money.sum(e.shares.values) != e.total) throw ArgumentError('Shares do not add up to the total');
+    final ids = {for (final m in group.members) m.id};
+    if (!ids.contains(e.paidBy) || !e.shares.keys.every(ids.contains)) {
+      throw ArgumentError('Someone in the expense is not in the group');
+    }
+  }
+
+  // ---- Invites ----------------------------------------------------------
+
+  @override
+  Future<Invite> createInvite(String uid, String groupId) async {
+    _requireMember(uid, groupId);
+    final now = clock();
+    for (final invite in _invites.values) {
+      if (invite.groupId == groupId && invite.expiresAt.isAfter(now.add(const Duration(days: 1)))) return invite;
+    }
+    var code = _newCode();
+    while (_invites.containsKey(code)) {
+      code = _newCode();
+    }
+    final invite = Invite(code: code, groupId: groupId, expiresAt: now.add(inviteLifetime));
+    _invites[code] = invite;
+    await _changed();
+    return invite;
+  }
+
+  @override
+  Future<InvitePreview> openInvite(String code) async {
+    final (invite, group) = _validInvite(code);
+    return InvitePreview(
+      code: invite.code,
+      groupName: group.name,
+      openNames: [
+        for (final m in group.members)
+          if (!m.claimed && !(seed && m.id == 'me')) m,
+      ],
+      memberCount: group.members.length,
+    );
+  }
+
+  @override
+  Future<String> claimInvite({required String uid, required String code, String? memberId, String? newName}) async {
+    final (_, group) = _validInvite(code);
+    if (_memberFor(group, uid) != null) throw AlreadyInGroup(group.id);
+    final Member joined;
+    final List<Member> members;
+    if (memberId != null) {
+      final target = group.memberById(memberId);
+      if (target == null || target.claimed) throw const NameTaken();
+      joined = target.claimedBy(uid);
+      members = [for (final m in group.members) m.id == memberId ? joined : m];
+    } else {
+      final name = newName?.trim() ?? '';
+      if (name.isEmpty) throw ArgumentError('A name is needed');
+      joined = Member(_newId('m'), name, userId: uid);
+      members = [...group.members, joined];
+    }
+    _groups[group.id] = group.copyWith(members: members);
+    _log(group.id, ActivityKind.memberJoined, joined.id, subject: joined.name);
+    await _changed();
+    return group.id;
+  }
+
+  (Invite, Group) _validInvite(String code) {
+    final invite = _invites[code.trim().toUpperCase()];
+    final group = invite == null ? null : _groups[invite.groupId];
+    if (invite == null || group == null) throw const InviteNotFound();
+    if (!invite.expiresAt.isAfter(clock())) throw const InviteExpired();
+    return (invite, group);
+  }
+
+  /// 8 letters and digits, leaving out ones that are easy to misread
+  /// (0/O, 1/I/L).
+  String _newCode() {
+    const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    return String.fromCharCodes([for (var i = 0; i < 8; i++) alphabet.codeUnitAt(_random.nextInt(alphabet.length))]);
+  }
+
+  // ---- Bookkeeping --------------------------------------------------------
+
+  String _newId(String prefix) =>
+      '$prefix${clock().microsecondsSinceEpoch.toRadixString(36)}${(_seq++).toRadixString(36)}';
+
+  void _log(
+    String groupId,
+    ActivityKind kind,
+    String authorId, {
+    String subject = '',
+    Money? amount,
+    String? expenseId,
+  }) {
+    (_activity[groupId] ??= []).add(
+      ActivityEntry(
+        id: _newId('a'),
+        groupId: groupId,
+        kind: kind,
+        authorId: authorId,
+        date: clock(),
+        subject: subject,
+        amount: amount,
+        expenseId: expenseId,
+      ),
+    );
+  }
+
+  Future<void> _changed() async {
+    _changes.add(null);
+    final store = _store;
+    if (store != null) await store.setString(storeKey, jsonEncode(_toJson()));
+  }
+
+  void _load(List<GroupLedger> ledgers) {
+    for (final l in ledgers) {
+      _groups[l.group.id] = l.group;
+      _expenses[l.group.id] = [...l.expenses];
+      _payments[l.group.id] = [...l.payments];
+      _activity[l.group.id] = [...l.activity];
+    }
+  }
+
+  Map<String, Object?> _toJson() => {
+    'groups': [for (final g in _groups.values) g.toJson()],
+    'expenses': [
+      for (final list in _expenses.values)
+        for (final e in list) e.toJson(),
+    ],
+    'payments': [
+      for (final list in _payments.values)
+        for (final p in list) p.toJson(),
+    ],
+    'activity': [
+      for (final list in _activity.values)
+        for (final a in list) a.toJson(),
+    ],
+    'invites': [for (final i in _invites.values) i.toJson()],
+  };
+
+  void _restore() {
+    final raw = _store?.getString(storeKey);
+    if (raw == null) return;
+    try {
+      final json = (jsonDecode(raw) as Map).cast<String, Object?>();
+      Iterable<Map<String, Object?>> rows(String key) => [
+        for (final r in (json[key] as List?) ?? const []) (r as Map).cast<String, Object?>(),
+      ];
+      for (final g in rows('groups').map(Group.fromJson)) {
+        _groups[g.id] = g;
+      }
+      for (final e in rows('expenses').map(Expense.fromJson)) {
+        (_expenses[e.groupId] ??= []).add(e);
+      }
+      for (final p in rows('payments').map(Payment.fromJson)) {
+        (_payments[p.groupId] ??= []).add(p);
+      }
+      for (final a in rows('activity').map(ActivityEntry.fromJson)) {
+        (_activity[a.groupId] ??= []).add(a);
+      }
+      for (final i in rows('invites').map(Invite.fromJson)) {
+        _invites[i.code] = i;
+      }
+    } on Object {
+      // A saved state from an older build that can't be read: start over.
+      _groups.clear();
+      _expenses.clear();
+      _payments.clear();
+      _activity.clear();
+      _invites.clear();
+    }
+  }
+
+  Future<void> dispose() => _changes.close();
 }
 
 const _me = Member('me', 'You');
@@ -115,6 +501,29 @@ List<GroupLedger> buildMockLedgers(DateTime now) {
         myMemberId: 'me',
         expenses: b.expenses.where((e) => e.groupId == g.id).toList(),
         payments: b.payments.where((p) => p.groupId == g.id).toList(),
+        // Each expense added by whoever paid, each payment by who paid it.
+        activity: [
+          for (final e in b.expenses.where((e) => e.groupId == g.id))
+            ActivityEntry(
+              id: 'a${e.id}',
+              groupId: g.id,
+              kind: ActivityKind.expenseAdded,
+              authorId: e.paidBy,
+              date: e.date,
+              subject: e.description,
+              amount: e.total,
+              expenseId: e.id,
+            ),
+          for (final p in b.payments.where((p) => p.groupId == g.id))
+            ActivityEntry(
+              id: 'a${p.id}',
+              groupId: g.id,
+              kind: ActivityKind.paymentRecorded,
+              authorId: p.from,
+              date: p.date,
+              amount: p.amount,
+            ),
+        ],
       ),
   ];
 }
@@ -164,6 +573,8 @@ class _Builder {
         shares: splitEqually(total, [for (final m in g.members) m.id]),
         category: category,
         source: source,
+        weights: {for (final m in g.members) m.id: 1},
+        addedBy: payer,
       ),
     );
   }

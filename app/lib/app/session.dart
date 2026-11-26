@@ -35,6 +35,21 @@ final class ReadySession extends SessionState {
   final UserProfile profile;
 }
 
+extension SessionPerson on SessionState {
+  /// The signed-in account, if any.
+  String? get uid => switch (this) {
+    ReadySession(:final user) || OnboardingSession(:final user) => user.uid,
+    _ => null,
+  };
+
+  /// The name friends see, once given.
+  String? get displayName => switch (this) {
+    ReadySession(:final profile) => profile.displayName,
+    OnboardingSession(:final profile) => profile?.displayName,
+    _ => null,
+  };
+}
+
 /// Follows the signed-in user and their profile.
 class SessionCubit extends Cubit<SessionState> {
   SessionCubit({

@@ -9,6 +9,8 @@ import '../../../core/analytics/events.dart';
 import '../../../core/time/clock.dart';
 import '../../../ui_kit/ui_kit.dart';
 import '../../groups/domain/group_ledger.dart';
+import '../../groups/presentation/create_group_sheet.dart';
+import '../../profile/domain/profile_repository.dart';
 import '../domain/home_snapshot.dart';
 import 'home_cubit.dart';
 import 'widgets/activity_section.dart';
@@ -30,9 +32,39 @@ class HomeScreen extends StatelessWidget {
     return BlocProvider(
       create: (context) =>
           HomeCubit(repository: context.read<GroupsRepository>(), uid: uid, clock: context.read<Clock>()),
-      child: const _HomeView(),
+      child: const _PendingInvite(child: _HomeView()),
     );
   }
+}
+
+/// An invite given during the sign-up chat is opened once Home is up, then
+/// forgotten, so it's asked about only once.
+class _PendingInvite extends StatefulWidget {
+  const _PendingInvite({required this.child});
+  final Widget child;
+
+  @override
+  State<_PendingInvite> createState() => _PendingInviteState();
+}
+
+class _PendingInviteState extends State<_PendingInvite> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final session = context.read<SessionCubit>().state;
+      if (session is! ReadySession) return;
+      final code = session.profile.pendingInviteCode;
+      if (code == null) return;
+      final router = GoRouter.of(context);
+      await context.read<ProfileRepository>().save(session.profile.copyWith(clearPendingInvite: true));
+      router.push(Paths.joinWith(code));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _HomeView extends StatelessWidget {
@@ -80,7 +112,10 @@ class _HomeView extends StatelessWidget {
                 label: 'Create a group',
                 size: KButtonSize.medium,
                 icon: Icons.add_rounded,
-                onPressed: () => soon('new_group', 'Creating groups arrives in Phase 2.'),
+                onPressed: () {
+                  track('new_group');
+                  showCreateGroupSheet(context);
+                },
               ),
             ),
           ),
@@ -134,9 +169,12 @@ class _HomeView extends StatelessWidget {
                 now: now,
                 onOpen: (GroupSummary g) {
                   track('open_group');
-                  KToast.show(context, 'The group screen arrives in Phase 2.');
+                  context.push(Paths.group(g.id));
                 },
-                onSeeAll: () => soon('all_groups', 'The full list of groups arrives in Phase 2.'),
+                onSeeAll: () {
+                  track('all_groups');
+                  context.push(Paths.groups);
+                },
               ),
               const SizedBox(height: KSpace.xl),
               KBanner(
@@ -170,12 +208,18 @@ class _HomeView extends StatelessWidget {
                 KIconButton(
                   icon: Icons.search_rounded,
                   label: 'Search',
-                  onPressed: () => soon('search', 'Search arrives in Phase 2.'),
+                  onPressed: () {
+                    track('search');
+                    context.push('${Paths.groups}?search=1');
+                  },
                 ),
                 KIconButton(
                   icon: Icons.group_add_outlined,
                   label: 'New group',
-                  onPressed: () => soon('new_group', 'Creating groups arrives in Phase 2.'),
+                  onPressed: () {
+                    track('new_group');
+                    showCreateGroupSheet(context);
+                  },
                 ),
               ],
             ),

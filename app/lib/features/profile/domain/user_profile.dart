@@ -36,6 +36,7 @@ final class UserProfile {
     String? privacyPolicyVersion,
     String? upiId,
     String? pendingInviteCode,
+    bool clearPendingInvite = false,
   }) => UserProfile(
     uid: uid,
     displayName: displayName ?? this.displayName,
@@ -43,7 +44,7 @@ final class UserProfile {
     privacyAcceptedAt: privacyAcceptedAt ?? this.privacyAcceptedAt,
     privacyPolicyVersion: privacyPolicyVersion ?? this.privacyPolicyVersion,
     upiId: upiId ?? this.upiId,
-    pendingInviteCode: pendingInviteCode ?? this.pendingInviteCode,
+    pendingInviteCode: clearPendingInvite ? null : (pendingInviteCode ?? this.pendingInviteCode),
   );
 
   Map<String, Object?> toJson() => {

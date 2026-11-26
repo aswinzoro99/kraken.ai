@@ -12,6 +12,10 @@ abstract final class Routes {
   static const activity = 'activity';
   static const account = 'account';
   static const debug = 'debug';
+  static const group = 'group';
+  static const groups = 'groups';
+  static const expense = 'expense_form';
+  static const joinGroup = 'join_group';
 }
 
 abstract final class Paths {
@@ -32,6 +36,20 @@ abstract final class Paths {
   static const activity = '/activity';
   static const account = '/account';
   static const debug = '/debug';
+
+  /// Every group, with search.
+  static const groups = '/home/groups';
+
+  /// Join a group with an invite code (`?code=` to fill it in).
+  static const join = '/home/join';
+
+  static String group(String id) => '/home/group/$id';
+
+  /// Add an expense to a group, or edit one ([expenseId]).
+  static String expense(String groupId, {String? expenseId}) =>
+      expenseId == null ? '/home/group/$groupId/expense' : '/home/group/$groupId/expense/$expenseId';
+
+  static String joinWith(String code) => '$join?code=${Uri.encodeQueryComponent(code)}';
 
   /// The five tabs of the signed-in app.
   static const tabs = [home, friends, insights, activity, account];

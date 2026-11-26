@@ -1,4 +1,3 @@
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../ui_kit/ui_kit.dart';
@@ -69,7 +68,7 @@ class _ActivityRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: KSpace.sm),
         child: Row(
           children: [
-            _DateBlock(item.date),
+            KDateBlock(item.date),
             const SizedBox(width: KSpace.md),
             Expanded(
               child: Column(
@@ -110,33 +109,6 @@ class _ActivityRow extends StatelessWidget {
                 if (effectAmount.isNotEmpty) Text(effectAmount, style: KText.amount.copyWith(color: effectColor)),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// "NOV / 23", like the expense list in the Group design.
-class _DateBlock extends StatelessWidget {
-  const _DateBlock(this.date);
-  final DateTime date;
-
-  @override
-  Widget build(BuildContext context) {
-    final k = context.k;
-    return Semantics(
-      label: DateFormat('d MMMM').format(date),
-      excludeSemantics: true,
-      child: SizedBox(
-        width: 40,
-        child: Column(
-          children: [
-            Text(
-              DateFormat.MMM().format(date).toUpperCase(),
-              style: KText.tiny.copyWith(color: k.muted, letterSpacing: 0.6),
-            ),
-            Text('${date.day}', style: KText.heading.copyWith(color: k.ink, height: 1.2)),
           ],
         ),
       ),

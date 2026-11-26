@@ -76,9 +76,10 @@ final class SupabaseProfileRepository implements ProfileRepository {
         });
         unawaited(load());
       },
-      onCancel: () async {
-        await saves?.cancel();
-        await out.close();
+      // Not awaited: `.first` waits for whatever this returns.
+      onCancel: () {
+        unawaited(saves?.cancel());
+        unawaited(out.close());
       },
     );
     return out.stream;

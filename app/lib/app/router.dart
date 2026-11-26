@@ -9,6 +9,12 @@ import '../debug/debug_screen.dart';
 import '../features/account/presentation/account_screen.dart';
 import '../features/auth/presentation/finish_sign_up_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
+import '../features/groups/presentation/activity_screen.dart';
+import '../features/groups/presentation/expense_form_screen.dart';
+import '../features/groups/presentation/friends_screen.dart';
+import '../features/groups/presentation/group_screen.dart';
+import '../features/groups/presentation/groups_list_screen.dart';
+import '../features/groups/presentation/join_group_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/onboarding/presentation/sign_in_chat_screen.dart';
 import '../features/shell/presentation/home_shell.dart';
@@ -60,7 +66,10 @@ GoRouter createRouter({
   required Analytics analytics,
   required bool debugAllowed,
 }) {
+  // Forms open over the tab bar; group screens keep it.
+  final root = GlobalKey<NavigatorState>(debugLabel: 'root');
   return GoRouter(
+    navigatorKey: root,
     initialLocation: Paths.splash,
     refreshListenable: refresh,
     observers: [AnalyticsRouteObserver(analytics)],
@@ -76,16 +85,59 @@ GoRouter createRouter({
         builder: (context, state, shell) => HomeShell(shell: shell),
         branches: [
           StatefulShellBranch(
-            routes: [GoRoute(path: Paths.home, name: Routes.home, builder: (_, _) => const HomeScreen())],
+            routes: [
+              GoRoute(
+                path: Paths.home,
+                name: Routes.home,
+                builder: (_, _) => const HomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'groups',
+                    name: Routes.groups,
+                    builder: (_, state) => GroupsListScreen(searching: state.uri.queryParameters['search'] == '1'),
+                  ),
+                  GoRoute(
+                    path: 'join',
+                    name: Routes.joinGroup,
+                    parentNavigatorKey: root,
+                    builder: (_, state) => JoinGroupScreen(initialCode: state.uri.queryParameters['code']),
+                  ),
+                  GoRoute(
+                    path: 'group/:groupId',
+                    name: Routes.group,
+                    builder: (_, state) => GroupScreen(groupId: state.pathParameters['groupId']!),
+                    routes: [
+                      GoRoute(
+                        path: 'expense',
+                        name: Routes.expense,
+                        parentNavigatorKey: root,
+                        builder: (_, state) => ExpenseFormScreen(groupId: state.pathParameters['groupId']!),
+                        routes: [
+                          GoRoute(
+                            path: ':expenseId',
+                            name: '${Routes.expense}_edit',
+                            parentNavigatorKey: root,
+                            builder: (_, state) => ExpenseFormScreen(
+                              groupId: state.pathParameters['groupId']!,
+                              expenseId: state.pathParameters['expenseId'],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ),
           StatefulShellBranch(
-            routes: [GoRoute(path: Paths.friends, name: Routes.friends, builder: (_, _) => const FriendsTab())],
+            routes: [GoRoute(path: Paths.friends, name: Routes.friends, builder: (_, _) => const FriendsScreen())],
           ),
           StatefulShellBranch(
             routes: [GoRoute(path: Paths.insights, name: Routes.insights, builder: (_, _) => const InsightsTab())],
           ),
           StatefulShellBranch(
-            routes: [GoRoute(path: Paths.activity, name: Routes.activity, builder: (_, _) => const ActivityTab())],
+            routes: [GoRoute(path: Paths.activity, name: Routes.activity, builder: (_, _) => const ActivityScreen())],
           ),
           StatefulShellBranch(
             routes: [GoRoute(path: Paths.account, name: Routes.account, builder: (_, _) => const AccountScreen())],

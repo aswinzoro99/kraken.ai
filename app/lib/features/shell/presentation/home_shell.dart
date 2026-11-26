@@ -4,8 +4,11 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../app/kraken_app.dart';
 import '../../../app/session.dart';
+import '../../../app/routes.dart';
 import '../../../core/analytics/events.dart';
 import '../../../ui_kit/ui_kit.dart';
+import '../../groups/domain/group_ledger.dart';
+import '../../groups/presentation/create_group_sheet.dart';
 
 /// The signed-in app: five tabs, each keeping its own navigation stack,
 /// under a floating Liquid Glass tab bar (icons only, Instagram-style) with
@@ -60,7 +63,6 @@ class HomeShell extends StatefulWidget {
   static const _comingSoon = {
     'talk': 'Talking to Kraken arrives in Phase 4.',
     'scan': 'Bill scanning arrives in Phase 5.',
-    'add': 'Adding expenses arrives in Phase 2.',
     'settle': 'Settle up arrives in Phase 6.',
   };
 
@@ -90,7 +92,65 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onAction(KQuickAction action) {
     context.analytics.log(QuickActionUsed(action.id, via: 'menu'));
+    if (action.id == 'add') {
+      _addExpense();
+      return;
+    }
     KToast.show(context, HomeShell._comingSoon[action.id] ?? 'Coming soon.');
+  }
+
+  /// Straight to the form with one group; otherwise "Which group?" first.
+  Future<void> _addExpense() async {
+    final router = GoRouter.of(context);
+    final uid = context.read<SessionCubit>().state.uid ?? '';
+    final List<GroupLedger> ledgers;
+    try {
+      ledgers = await context.read<GroupsRepository>().watchLedgers(uid).first;
+    } on Object {
+      if (mounted) KToast.show(context, "Couldn't load your groups. Try again.", kind: KToastKind.error);
+      return;
+    }
+    if (!mounted) return;
+    if (ledgers.isEmpty) {
+      KToast.show(context, 'Make a group first, then add expenses to it.');
+      await showCreateGroupSheet(context);
+      return;
+    }
+    if (ledgers.length == 1) {
+      router.push(Paths.expense(ledgers.single.group.id));
+      return;
+    }
+    final sorted = [...ledgers]
+      ..sort((a, b) => (b.lastActivity ?? DateTime(0)).compareTo(a.lastActivity ?? DateTime(0)));
+    final picked = await showKSheet<String>(
+      context,
+      builder: (sheet) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: Text('Add to which group?', style: KText.heading.copyWith(color: sheet.k.ink, fontSize: 19)),
+          ),
+          const SizedBox(height: KSpace.xs),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final l in sorted)
+                  KListRow(
+                    title: l.group.name,
+                    subtitle: [for (final m in l.group.members) l.nameOf(m.id)].join(', '),
+                    leading: KAvatar(name: l.group.name, tone: KTone.neutral),
+                    onTap: () => Navigator.of(sheet).pop(l.group.id),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (picked != null) router.push(Paths.expense(picked));
   }
 
   void _onTalk(bool completed) {

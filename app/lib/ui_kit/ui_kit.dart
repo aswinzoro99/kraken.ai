@@ -17,6 +17,7 @@ export 'components/k_button.dart';
 export 'components/k_card.dart';
 export 'components/k_check_row.dart';
 export 'components/k_chip.dart';
+export 'components/k_date_block.dart';
 export 'components/k_segmented.dart';
 export 'components/k_tag.dart';
 export 'components/k_text_field.dart';

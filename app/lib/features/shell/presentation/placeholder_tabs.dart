@@ -27,17 +27,6 @@ class _ComingTab extends StatelessWidget {
   );
 }
 
-class FriendsTab extends StatelessWidget {
-  const FriendsTab({super.key});
-  @override
-  Widget build(BuildContext context) => const _ComingTab(
-    title: 'Friends',
-    illustration: KIllustrations.emptyFriends,
-    heading: 'Your friends show up here',
-    message: 'Everyone you share a group with, and where you stand with each of them. Arrives with groups in Phase 2.',
-  );
-}
-
 class InsightsTab extends StatelessWidget {
   const InsightsTab({super.key});
   @override
@@ -46,16 +35,5 @@ class InsightsTab extends StatelessWidget {
     illustration: KIllustrations.emptyInsights,
     heading: 'See where your money goes',
     message: 'Your share of spending by month, year, category and group. Arrives in Phase 7.',
-  );
-}
-
-class ActivityTab extends StatelessWidget {
-  const ActivityTab({super.key});
-  @override
-  Widget build(BuildContext context) => const _ComingTab(
-    title: 'Activity',
-    illustration: KIllustrations.emptyActivity,
-    heading: 'Every change, in order',
-    message: 'Expenses, payments and edits across your groups, with who made each. Arrives in Phase 2.',
   );
 }

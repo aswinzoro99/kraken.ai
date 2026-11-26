@@ -49,7 +49,8 @@ final class SupabaseAuthRepository implements AuthRepository {
           onError: (Object _) => push(currentUser),
         );
       },
-      onCancel: () => sub?.cancel(),
+      // Not awaited: `.first` waits for whatever this returns.
+      onCancel: () => unawaited(sub?.cancel()),
     );
     return out.stream;
   }

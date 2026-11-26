@@ -55,6 +55,8 @@ Future<T?> showKSheet<T>(BuildContext context, {required WidgetBuilder builder})
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    // Above the floating tab bar, which would otherwise cover the bottom.
+    useRootNavigator: true,
     builder: (ctx) => Padding(
       padding: EdgeInsets.fromLTRB(KSpace.gutter, 0, KSpace.gutter, KSpace.xl + MediaQuery.viewInsetsOf(ctx).bottom),
       child: builder(ctx),
@@ -75,6 +77,7 @@ Future<bool> showConfirmSheet(
   final result = await showModalBottomSheet<bool>(
     context: context,
     useSafeArea: true,
+    useRootNavigator: true,
     builder: (ctx) {
       final k = ctx.k;
       return Padding(

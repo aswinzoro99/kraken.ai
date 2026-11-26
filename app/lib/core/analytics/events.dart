@@ -209,3 +209,71 @@ final class QuickActionUsed extends AnalyticsEvent {
   @override
   Map<String, Object> get params => {'action': action, 'via': via, 'completed': ?completed};
 }
+
+// ---- Groups and expenses (Phase 2). No names, amounts or descriptions. ----
+
+final class GroupCreated extends AnalyticsEvent {
+  const GroupCreated({required this.memberCount});
+  final int memberCount;
+  @override
+  String get name => 'group_created';
+  @override
+  Map<String, Object> get params => {'member_count': memberCount};
+}
+
+/// An expense was added or edited by hand.
+final class ExpenseSaved extends AnalyticsEvent {
+  const ExpenseSaved({required this.split, required this.edited, required this.people});
+
+  /// `equal`, `exact`, `percent` or `shares`.
+  final String split;
+  final bool edited;
+
+  /// How many people share it.
+  final int people;
+  @override
+  String get name => 'expense_saved';
+  @override
+  Map<String, Object> get params => {'split': split, 'edited': edited, 'people': people};
+}
+
+final class ExpenseDeleted extends AnalyticsEvent {
+  const ExpenseDeleted({required this.undone});
+
+  /// The delete was undone straight after.
+  final bool undone;
+  @override
+  String get name => 'expense_deleted';
+  @override
+  Map<String, Object> get params => {'undone': undone};
+}
+
+final class InviteShared extends AnalyticsEvent {
+  const InviteShared();
+  @override
+  String get name => 'invite_shared';
+}
+
+/// Someone opened an invite and took a name (or it didn't work).
+final class InviteClaimed extends AnalyticsEvent {
+  const InviteClaimed({required this.result});
+
+  /// `joined`, `not_found`, `expired`, `name_taken` or `already_in`.
+  final String result;
+  @override
+  String get name => 'invite_claimed';
+  @override
+  Map<String, Object> get params => {'result': result};
+}
+
+final class GroupAction extends AnalyticsEvent {
+  const GroupAction(this.action);
+
+  /// `add_expense`, `open_expense`, `invite`, `settle_up`, `totals`,
+  /// `tab_expenses` or `tab_activity`.
+  final String action;
+  @override
+  String get name => 'group_action';
+  @override
+  Map<String, Object> get params => {'action': action};
+}

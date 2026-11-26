@@ -65,8 +65,9 @@ Future<KeyValueStore> startSignedOut(KeyValueStore store) async {
   return store;
 }
 
-/// Real sign-in and profiles on Supabase (phantom-services). Groups stay
-/// sample data until Phase 2.
+/// Real sign-in and profiles on Supabase (phantom-services). Groups,
+/// expenses and invites are kept on the phone (MockGroupsRepository) until
+/// their server side is built.
 Future<AppServices> supabaseServices({required AppConfig config, required KeyValueStore store}) async {
   await Supabase.initialize(url: config.supabaseUrl.toString(), publishableKey: config.supabaseAnonKey);
   final client = Supabase.instance.client;
@@ -81,7 +82,9 @@ Future<AppServices> supabaseServices({required AppConfig config, required KeyVal
     haptics: Haptics(const SystemHapticsEngine(), store),
     auth: SupabaseAuthRepository(client),
     profiles: SupabaseProfileRepository(client),
-    groups: const MockGroupsRepository(clock: systemClock),
+    // Phase 2 runs on the phone until the groups server exists: your
+    // groups start empty and are saved on this phone.
+    groups: MockGroupsRepository(seed: false, store: store),
     devTools: DevTools(recorder: recorder),
   );
 }
